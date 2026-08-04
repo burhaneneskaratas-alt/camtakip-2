@@ -1079,6 +1079,10 @@ function renderWorkshop(){
       </div>
       <div class="pane" style="padding:18px 20px;">
         <div style="font-family:var(--font-display); font-weight:700; font-size:13px; margin-bottom:12px;">📤 Toplu İşlemler</div>
+        <div class="seg" id="bulkCamTypeToggle" style="margin-bottom:10px; max-width:fit-content;">
+          <button data-val="cam" class="active">🪟 Cam</button>
+          <button data-val="isicam">🧊 Isıcam</button>
+        </div>
         <div class="seg" id="bulkPanelToggle" style="margin-bottom:14px; max-width:fit-content;">
           <button data-val="etiket" class="active">🏷️ Etiket</button>
           <button data-val="excel">📊 Excel</button>
@@ -1109,6 +1113,9 @@ function renderWorkshop(){
   });
   document.querySelectorAll('#bulkPanelToggle button').forEach(b=>{
     b.onclick = ()=> setBulkPanelTab(b.dataset.val);
+  });
+  document.querySelectorAll('#bulkCamTypeToggle button').forEach(b=>{
+    b.onclick = ()=> setBulkCamTypeTab(b.dataset.val);
   });
   renderReportSection();
   renderCatalogSection();
@@ -3471,6 +3478,13 @@ function setBulkPanelTab(tab){
     if(el) el.style.display = key===tab ? 'block' : 'none';
   });
 }
+function isOrderIsicam(o){ return /^Isıcam:/i.test(o.renk||''); }
+let bulkCamTypeTab = 'cam';
+function setBulkCamTypeTab(tab){
+  bulkCamTypeTab = tab;
+  document.querySelectorAll('#bulkCamTypeToggle button').forEach(b=> b.classList.toggle('active', b.dataset.val===tab));
+  renderBulkEtiket(); renderBulkExcel(); renderBulkAsc();
+}
 function renderReportSection(){
   const el = document.getElementById('reportSection');
   if(!el) return;
@@ -3881,7 +3895,7 @@ async function exportOrdersToBulkExcel(selOrders){
 function renderBulkExcel(){
   const el = document.getElementById('bulkExcelSection');
   if(!el) return;
-  const active = orders.filter(o=>o.status < DELIVERED_INDEX);
+  const active = orders.filter(o=>o.status < DELIVERED_INDEX && isOrderIsicam(o)===(bulkCamTypeTab==='isicam'));
   // Mevcut işaretleme durumunu koru — arama/filtre değişince (bu fonksiyon her renderList'te
   // yeniden çağrılıyor) kullanıcının elle kaldırdığı tikler geri gelmesin.
   const prevChecked = {};
@@ -4341,7 +4355,7 @@ function printEtiketlerBulk(selOrders){
 function renderBulkEtiket(){
   const el = document.getElementById('bulkEtiketSection');
   if(!el) return;
-  const active = orders.filter(o=>o.status < DELIVERED_INDEX && (o.lines||[]).length);
+  const active = orders.filter(o=>o.status < DELIVERED_INDEX && (o.lines||[]).length && isOrderIsicam(o)===(bulkCamTypeTab==='isicam'));
   // Mevcut işaretleme durumunu koru — arama/filtre değişince kullanıcının elle
   // kaldırdığı tikler geri gelmesin.
   const prevChecked = {};
@@ -4413,7 +4427,8 @@ function orderPieceCount(o){
 function renderBulkAsc(){
   const el = document.getElementById('bulkAscSection');
   if(!el) return;
-  const active = orders.filter(o=>o.status < DELIVERED_INDEX);
+  const isIsicamTab = bulkCamTypeTab==='isicam';
+  const active = orders.filter(o=>o.status < DELIVERED_INDEX && isOrderIsicam(o)===isIsicamTab);
   // Mevcut işaretleme durumunu koru — arama/filtre değişince kullanıcının elle
   // kaldırdığı tikler geri gelmesin.
   const prevChecked = {};
@@ -4446,7 +4461,12 @@ function renderBulkAsc(){
           </label>`).join('')}
       </div>
     </div>`;
-  }).join('');
+  }).join('') + (isIsicamTab ? `
+    <div class="form-actions" style="margin-top:4px;">
+      <button class="btn btn-primary btn-sm" id="bulkAscAyirBtn">🔀 Ayır ve renklere göre indir</button>
+      <span class="hint">Yukarıda işaretli siparişlerin dış/iç camlarını ayırıp renklerine göre (Füme, Şeffaf, vb.) ayrı ASC dosyaları indirir. Aynı renkli çift cam (örn. Füme+Füme) adet ×2 yazılır.</span>
+    </div>
+  ` : '');
   el.querySelectorAll('.bulkAscDownload').forEach(b=>{
     b.onclick = ()=>{
       const key = decodeURIComponent(b.dataset.key);
@@ -4456,6 +4476,64 @@ function renderBulkAsc(){
       const selOrders = orders.filter(o=>ids.includes(String(o.id)));
       exportOrdersToBulkASC(selOrders, key);
     };
+  });
+  const ayirBtn = document.getElementById('bulkAscAyirBtn');
+  if(ayirBtn){
+    ayirBtn.onclick = ()=>{
+      const ids = Array.from(el.querySelectorAll('.bulkAscCheck:checked')).map(c=>c.dataset.id);
+      const uniqueIds = [...new Set(ids)];
+      if(uniqueIds.length===0){ alert('En az bir sipariş seçili olmalı.'); return; }
+      const selOrders = orders.filter(o=>uniqueIds.includes(String(o.id)));
+      exportIsicamSplitByColor(selOrders);
+    };
+  }
+}
+
+// Isıcam siparişleri dış/iç camlarına ayırıp renklerine göre gruplar. Aynı renk kombinasyonunda
+// (örn. Füme+Füme) her iki cam da aynı renge gittiği için adet ×2 yazılır; karışık renkte
+// (örn. Füme+Şeffaf) her cam kendi renk grubuna adet ×1 olarak gider.
+function splitIsicamOrdersByColor(selOrders){
+  const colorGroups = {}; // { 'FÜME': Map(key -> {w,h,qty,not1,camKodu,compMatCode,custCode,firma,kisi,girisTarihi,teslimTarihi}) }
+  selOrders.forEach(o=>{
+    const isicamMatch = (o.renk||'').match(/^Isıcam:\s*([\d+]+)\s+(.+)$/i);
+    if(!isicamMatch) return;
+    const yapi = isicamMatch[1].split('+');
+    const renkler = isicamMatch[2].split('+');
+    const t1 = yapi[0]||'', t2 = yapi[2]||yapi[0]||'';
+    const r1 = ascUp(renkler[0]||''), r2 = ascUp(renkler[1]||renkler[0]||'');
+    const sameColor = r1 === r2;
+    const firma = o.bayi_adi||'', kisi = o.cust_name||'';
+    const custCode = (o.asc_customer_code && o.asc_customer_code.trim()) ? ascUp(o.asc_customer_code.trim()) : ascCustCode(firma, kisi);
+    const girisTarihi = ascDDMMYYYY(o.created_at ? o.created_at.slice(0,10) : null);
+    const teslimTarihi = ascDDMMYYYY(o.due);
+    (o.lines||[]).forEach(l=>{
+      const qty = parseInt(l.qty)||1;
+      const not1 = ascNotesKisalt(l.note);
+      const addPane = (renk, kalinlik, mult)=>{
+        const camKoduPane = `${kalinlik}MM${renk}`.slice(0,17);
+        const compMatPane = `${kalinlik}MM${renk}`;
+        if(!colorGroups[renk]) colorGroups[renk] = new Map();
+        const map = colorGroups[renk];
+        const key = `${l.w}|${l.h}|${not1}|${kalinlik}|${custCode}|${firma}|${kisi}`;
+        if(map.has(key)) map.get(key).qty += qty*mult;
+        else map.set(key, {w:l.w, h:l.h, qty: qty*mult, not1, camKodu:camKoduPane, compMatCode:compMatPane, custCode, firma, kisi, girisTarihi, teslimTarihi});
+      };
+      if(sameColor) addPane(r1, t1, 2);
+      else { addPane(r1, t1, 1); addPane(r2, t2, 1); }
+    });
+  });
+  return colorGroups;
+}
+
+function exportIsicamSplitByColor(selOrders){
+  const colorGroups = splitIsicamOrdersByColor(selOrders);
+  const colors = Object.keys(colorGroups);
+  if(colors.length===0){ alert('Seçili siparişlerde Isıcam verisi bulunamadı.'); return; }
+  const girisTarihiHeader = ascDDMMYYYY(null);
+  colors.forEach(renk=>{
+    const pieces = [...colorGroups[renk].values()];
+    const rows = pieces.map((p,i)=>ascBuildRow(i+1, p.camKodu, p.custCode, p.w, p.h, p.qty, '', p.not1, p.firma, p.kisi, p.girisTarihi, p.teslimTarihi, p.compMatCode));
+    downloadASCText(rows, renk, girisTarihiHeader, renk);
   });
 }
 
