@@ -989,6 +989,11 @@ function renderWorkshop(){
       </div>
       <div class="field"><label for="w_note">Not</label><input id="w_note" type="text" placeholder="Örn: 2 delik, çentikli kesim"></div>
       <div class="field">
+        <label for="w_fiyat">Birim Fiyat (TL/m², opsiyonel — sadece Excel'e yazılır)</label>
+        <input id="w_fiyat" type="number" step="0.01" placeholder="0">
+        <div class="hint" style="margin-top:4px;">Toplam m² ile çarpılıp Excel çıktısında ayrı bir bölümde gösterilir, ekranda hiçbir yerde görünmez.</div>
+      </div>
+      <div class="field">
         <label for="w_asc_code">Optime Customer Kodu (opsiyonel)</label>
         <input id="w_asc_code" type="text" placeholder="Boş bırakırsan otomatik hesaplanır (örn: MSTF-YY3)">
         <div class="hint" style="margin-top:4px;">ASC'ye aktarırken "Customer" alanına bu kod yazılır. Boş bırakırsan bayi+müşteri adından otomatik üretilir.</div>
@@ -1016,11 +1021,9 @@ function renderWorkshop(){
         </div>
         <div class="seg" id="bulkPanelToggle" style="margin-bottom:14px; max-width:fit-content;">
           <button data-val="etiket" class="active">🏷️ Etiket</button>
-          <button data-val="excel">📊 Excel</button>
           <button data-val="asc">📋 ASC</button>
         </div>
         <div id="bulkEtiketSection"></div>
-        <div id="bulkExcelSection" style="display:none;"></div>
         <div id="bulkAscSection" style="display:none;"></div>
       </div>
     </div>
@@ -1136,7 +1139,7 @@ async function submitWorkshopOrder(){
     renk: document.getElementById('w_isicam').checked
       ? buildIsicamText('w')
       : segVal('w_renk'),
-    lines: linesClean.map(l=>({w:parseFloat(l.w), h:parseFloat(l.h), qty:parseInt(l.qty), note:l.note||'', dm:l.dm||[], sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:l.isicam||{}, fiyat:l.fiyat||''})),
+    lines: linesClean.map(l=>({w:parseFloat(l.w), h:parseFloat(l.h), qty:parseInt(l.qty), note:l.note||'', dm:l.dm||[], sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:l.isicam||{}, fiyat:document.getElementById('w_fiyat').value||''})),
     note: document.getElementById('w_note').value,
     asc_customer_code: document.getElementById('w_asc_code').value.trim() || null,
     due: document.getElementById('w_due').value || null,
@@ -1154,7 +1157,7 @@ async function submitWorkshopOrder(){
   document.getElementById('w_cancelEdit').style.display = 'none';
   await loadOrdersForSeller();
   renderStats(); renderFilters(); renderList(true);
-  document.getElementById('w_bayi').value=''; document.getElementById('w_cust').value=''; document.getElementById('w_addr').value=''; document.getElementById('w_note').value=''; document.getElementById('w_due').value='';
+  document.getElementById('w_bayi').value=''; document.getElementById('w_cust').value=''; document.getElementById('w_addr').value=''; document.getElementById('w_note').value=''; document.getElementById('w_due').value=''; document.getElementById('w_fiyat').value='';
   document.getElementById('w_isicam').checked=false; document.getElementById('w_isicam_detail').style.display='none';
   lineState=[]; addLine();
   setTimeout(()=>statusEl.textContent='',2000);
@@ -2207,6 +2210,10 @@ function openEditOrder(o, isSellerView){
   const addrEl = document.getElementById(prefix+'_addr'); if(addrEl) addrEl.value = o.cust_address || '';
   const noteEl = document.getElementById(prefix+'_note'); if(noteEl) noteEl.value = o.note || '';
   const ascCodeEl = document.getElementById(prefix+'_asc_code'); if(ascCodeEl) ascCodeEl.value = o.asc_customer_code || '';
+  if(isSellerView){
+    const fiyatEl = document.getElementById('w_fiyat');
+    if(fiyatEl) fiyatEl.value = (o.lines && o.lines[0] && o.lines[0].fiyat) || '';
+  }
 
   const catSel = document.getElementById(prefix+'_kategori');
   if(catSel){
@@ -2314,11 +2321,6 @@ function renderLines(){
         : `<button class="btn btn-ghost btn-sm sekil-foto-btn" data-idx="${i}">📷 Şekil fotoğrafı/krokisi ekle</button>
            <span class="hint sekil-foto-status" data-idx="${i}"></span>`}
       <input type="file" accept="image/*" capture="environment" class="sekil-foto-input" data-idx="${i}" style="display:none;">
-    </div>` : ''}
-    ${prefix==='w' ? `
-    <div class="line-fiyat" style="display:flex; align-items:center; gap:6px; margin:-4px 0 10px 0; padding-left:4px;">
-      <label style="font-size:11px; color:var(--text-mut);">Birim Fiyat (TL/m², opsiyonel — sadece Excel'e yazılır):</label>
-      <input type="number" step="0.01" placeholder="0" value="${l.fiyat||''}" data-field="fiyat" data-idx="${i}" style="width:100px; padding:4px 8px; font-size:12px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text);">
     </div>` : ''}
   `).join('');
   el.querySelectorAll('.sekil-foto-btn').forEach(btn=>{
@@ -3378,7 +3380,7 @@ function renderList(isSellerView){
       });
     }
   }
-  if(isSellerView){ renderBulkEtiket(); renderBulkAsc(); renderBulkExcel(); }
+  if(isSellerView){ renderBulkEtiket(); renderBulkAsc(); }
 }
 
 function updateBulkDeleteBar(){
@@ -3461,7 +3463,7 @@ let bulkPanelTab = 'etiket';
 function setBulkPanelTab(tab){
   bulkPanelTab = tab;
   document.querySelectorAll('#bulkPanelToggle button').forEach(b=> b.classList.toggle('active', b.dataset.val===tab));
-  const map = {etiket:'bulkEtiketSection', excel:'bulkExcelSection', asc:'bulkAscSection'};
+  const map = {etiket:'bulkEtiketSection', asc:'bulkAscSection'};
   Object.entries(map).forEach(([key,id])=>{
     const el = document.getElementById(id);
     if(el) el.style.display = key===tab ? 'block' : 'none';
@@ -3472,7 +3474,7 @@ let bulkCamTypeTab = 'cam';
 function setBulkCamTypeTab(tab){
   bulkCamTypeTab = tab;
   document.querySelectorAll('#bulkCamTypeToggle button').forEach(b=> b.classList.toggle('active', b.dataset.val===tab));
-  renderBulkEtiket(); renderBulkExcel(); renderBulkAsc();
+  renderBulkEtiket(); renderBulkAsc();
 }
 function renderReportSection(){
   const el = document.getElementById('reportSection');
@@ -3753,13 +3755,16 @@ function drawOrderExcelBlock(wb, ws, o, base){
       genelTutar += tutar;
       styleCell(ws.getCell(`K${r}`), {font:FONT_TBL_N, align:{h:'center'}, border:false, numFmt:'#,##0.00'});
       ws.getCell(`K${r}`).value = fiyat;
+      // Tutar tam hassasiyetle (yuvarlamadan) yazılıyor — yukarıya abartılı yuvarlama
+      // yüzünden fiyat gerçekte olduğundan fazla görünmesin diye. numFmt sadece
+      // görünümü 2 ondalığa indiriyor, saklanan değer tam kalıyor.
       styleCell(ws.getCell(`L${r}`), {font:FONT_TBL_N, align:{h:'center'}, border:false, numFmt:'#,##0.00'});
-      ws.getCell(`L${r}`).value = Number(tutar.toFixed(2));
+      ws.getCell(`L${r}`).value = tutar;
     });
     styleCell(ws.getCell(`K${totalRow}`), {font:FONT_TBL, fill:GRAY_FILL, border:false, align:{h:'right'}});
     ws.getCell(`K${totalRow}`).value = 'GENEL TOPLAM:';
     styleCell(ws.getCell(`L${totalRow}`), {font:FONT_TBL, fill:GRAY_FILL, border:false, numFmt:'#,##0.00 "TL"'});
-    ws.getCell(`L${totalRow}`).value = Number(genelTutar.toFixed(2));
+    ws.getCell(`L${totalRow}`).value = genelTutar;
   }
   return lastUsedRow;
 }
@@ -3851,92 +3856,6 @@ function askExcelCopiesAndExport(o){
   if(input === null) return; // iptal
   const copies = Math.max(1, parseInt(input)||1);
   exportOrderToExcelGenel(o, copies);
-}
-
-// Birden fazla siparişi TEK Excel sayfasında alt alta bloklar hâlinde birleştirir.
-// Her sipariş küçük olduğu için (az satırlı) A4 sayfasına doğal akışla 2-4 tanesi sığar —
-// artık tek tek indirip elle kopyala-yapıştır yapmaya gerek yok, hepsi tek dosyada,
-// yazdırma önizlemesi de hepsini gösterir. Bir blok sayfa ortasında bölünecekse
-// (yarısı 1. sayfa, yarısı 2. sayfa) otomatik olarak bir sonraki sayfaya atılır.
-async function exportOrdersToBulkExcel(selOrders){
-  if(!selOrders.length) return;
-  const wb = new ExcelJS.Workbook();
-  const ws = wb.addWorksheet('Siparişler', {
-    pageSetup:{
-      orientation:'portrait', paperSize:9,
-      fitToPage:true, fitToWidth:1, fitToHeight:0, // genişlik hep tek sayfa, yükseklik doğal akış
-      horizontalCentered:true,
-      margins:{left:0.3, right:0.3, top:0.3, bottom:0.3, header:0.1, footer:0.1}
-    }
-  });
-  ws.columns = [{width:5}, {width:10}, {width:10}, {width:7}, {width:8.86}, {width:12}, {width:16}, {width:18}, {width:2.86}, {width:3}, {width:16}, {width:14}];
-
-  const lastUsedRow = layoutOrderBlocks(wb, ws, selOrders);
-  // Bkz. exportOrderToExcelGenel — elle sonradan eklenen not/çizim de yazdırılsın diye pay bırakılıyor.
-  ws.pageSetup.printArea = `A1:I${lastUsedRow + 1000}`;
-
-  const tarihStr = safeFilenamePart(new Date().toLocaleDateString('tr-TR'));
-  await downloadWorkbook(wb, `Toplu Siparis ${tarihStr} (${selOrders.length} adet).xlsx`);
-}
-
-
-// "Toplu Excel Aktar" bölümünü çizer — bekleyen siparişlerden seçilenleri tek dosyada birleştirir.
-function renderBulkExcel(){
-  const el = document.getElementById('bulkExcelSection');
-  if(!el) return;
-  const active = orders.filter(o=>o.status < DELIVERED_INDEX && isOrderIsicam(o)===(bulkCamTypeTab==='isicam'));
-  // Mevcut işaretleme durumunu koru — arama/filtre değişince (bu fonksiyon her renderList'te
-  // yeniden çağrılıyor) kullanıcının elle kaldırdığı tikler geri gelmesin.
-  const prevChecked = {};
-  el.querySelectorAll('.bulkExcelCheck').forEach(c=>{ prevChecked[c.dataset.id] = c.checked; });
-  if(active.length===0){
-    el.innerHTML = `<div class="pane empty-state"><div style="font-size:13px;">Birleştirilecek bekleyen sipariş yok.</div></div>`;
-    return;
-  }
-  // ASC bölümündeki gibi, siparişler cam kalınlığına göre (8mm/6mm/5mm vb.) gruplanıp
-  // ayrı kutular hâlinde gösteriliyor.
-  const groups = {};
-  active.forEach(o=>{
-    const key = parseKalinlik(o.product_label) || 'BELİRSİZ KALINLIK';
-    (groups[key] = groups[key] || []).push(o);
-  });
-  const keys = Object.keys(groups).sort();
-  el.innerHTML = keys.map(key=>`
-    <div class="pane form-card bulk-asc-group" style="margin-bottom:14px;">
-      <div class="bulk-asc-head"><b>${key}</b><span class="hint">${groups[key].length} sipariş</span></div>
-      <div class="bulk-asc-list">
-        ${groups[key].map(o=>`
-          <label class="bulk-asc-item">
-            <input type="checkbox" class="bulkExcelCheck" data-id="${o.id}" ${prevChecked[o.id]===false ? '' : 'checked'}>
-            <span>#${o.id} · ${o.bayi_adi || o.cust_name || ''}${o.cust_address?' · 📍'+o.cust_address:''} · ${orderPieceCount(o)} parça</span>
-          </label>`).join('')}
-      </div>
-    </div>`).join('') + `
-    <div class="form-actions" style="margin-top:10px;">
-      <span class="hint" id="bulkExcelCount"></span>
-      <button class="btn btn-ghost btn-sm" id="bulkExcelToggleAll">Tümünü seç/kaldır</button>
-      <button class="btn btn-primary btn-sm" id="bulkExcelDownload">Excel olarak indir</button>
-    </div>
-  `;
-  const countEl = el.querySelector('#bulkExcelCount');
-  const updateCount = ()=>{
-    const n = el.querySelectorAll('.bulkExcelCheck:checked').length;
-    countEl.textContent = `${n} sipariş seçili`;
-  };
-  el.querySelectorAll('.bulkExcelCheck').forEach(chk=> chk.onchange = updateCount);
-  updateCount();
-  el.querySelector('#bulkExcelToggleAll').onclick = ()=>{
-    const checks = el.querySelectorAll('.bulkExcelCheck');
-    const allChecked = Array.from(checks).every(c=>c.checked);
-    checks.forEach(c=> c.checked = !allChecked);
-    updateCount();
-  };
-  el.querySelector('#bulkExcelDownload').onclick = ()=>{
-    const ids = Array.from(el.querySelectorAll('.bulkExcelCheck:checked')).map(c=>c.dataset.id);
-    if(ids.length===0){ alert('En az bir sipariş seçili olmalı.'); return; }
-    const selOrders = orders.filter(o=>ids.includes(String(o.id)));
-    exportOrdersToBulkExcel(selOrders);
-  };
 }
 
 async function downloadWorkbook(wb, filename){
@@ -4368,7 +4287,7 @@ function renderBulkEtiket(){
         ${groups[key].map(o=>`
           <label class="bulk-asc-item">
             <input type="checkbox" class="bulkEtkCheck" data-id="${o.id}" ${prevChecked[o.id]===false ? '' : 'checked'}>
-            <span>#${o.id} · ${o.bayi_adi || o.cust_name || ''}${o.cust_address?' · 📍'+o.cust_address:''} · ${orderPieceCount(o)} etiket</span>
+            <span>#${o.id} · ${o.bayi_adi||''}${o.cust_name && o.cust_name!==o.bayi_adi ? ' · 👤 '+o.cust_name : ''}${o.cust_address?' · 📍'+o.cust_address:''} · ${orderPieceCount(o)} etiket</span>
           </label>`).join('')}
       </div>
     </div>`).join('') + `
@@ -4456,7 +4375,7 @@ function renderBulkAsc(){
         ${grp.map(o=>`
           <label class="bulk-asc-item">
             <input type="checkbox" class="bulkAscCheck" data-key="${encodeURIComponent(key)}" data-id="${o.id}" ${prevChecked[o.id]===false ? '' : 'checked'}>
-            <span>#${o.id} · ${o.bayi_adi || o.cust_name || ''}${o.cust_address?' · 📍'+o.cust_address:''} · ${orderPieceCount(o)} parça</span>
+            <span>#${o.id} · ${o.bayi_adi||''}${o.cust_name && o.cust_name!==o.bayi_adi ? ' · 👤 '+o.cust_name : ''}${o.cust_address?' · 📍'+o.cust_address:''} · ${orderPieceCount(o)} parça</span>
           </label>`).join('')}
       </div>
     </div>`;
