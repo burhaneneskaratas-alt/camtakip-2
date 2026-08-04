@@ -3691,44 +3691,32 @@ function drawOrderExcelBlock(wb, ws, o, base){
     lastUsedRow = r - 1;
   }
 
-  // Fiyat Bölümü — sadece en az bir satıra birim fiyat girilmişse eklenir.
-  // Bilerek sadece Excel çıktısında: uygulama ekranlarının hiçbirinde (müşteri veya
-  // satıcı listesinde) fiyat gösterilmiyor, bu satıcı-only bilgi sadece bu dosyada yer alır.
+  // Fiyat — sadece en az bir satıra birim fiyat girilmişse eklenir. Bilerek tablonun
+  // SAĞINA (K/L sütunları) yazılıyor: A4 yazdırma alanı sadece A:I sütunlarını kapsıyor,
+  // bu yüzden fiyat ekranda/Excel'de görünür ama kağıda hiç basılmıyor.
   const fiyatLines = lines.filter(l=>l.fiyat && parseFloat(l.fiyat)>0);
   if(fiyatLines.length){
-    let r = lastUsedRow + 2;
-    ws.mergeCells(`A${r}:I${r}`);
-    styleCell(ws.getCell(`A${r}`), {font:FONT_HDR, fill:GRAY_FILL, align:{h:'center'}});
-    ws.getCell(`A${r}`).value = 'Fiyat';
-    r += 1;
-    ['No','Genişlik','Yükseklik','Adet','m2','Birim Fiyat (TL/m²)','Tutar (TL)'].forEach((val,i)=>{
-      const cell = ws.getCell(r, i+1);
-      styleCell(cell, {font:FONT_TBL, align:{h:'center'}});
-      cell.value = val;
-    });
-    r += 1;
+    styleCell(ws.getCell(`K${R(11)}`), {font:FONT_TBL, align:{h:'center'}, border:false});
+    ws.getCell(`K${R(11)}`).value = 'Birim Fiyat (TL/m²)';
+    styleCell(ws.getCell(`L${R(11)}`), {font:FONT_TBL, align:{h:'center'}, border:false});
+    ws.getCell(`L${R(11)}`).value = 'Tutar (TL)';
     let genelTutar = 0;
     lines.forEach((l,i)=>{
+      const r = firstRow + i;
       const qty = parseInt(l.qty)||0, w = parseFloat(l.w)||0, h = parseFloat(l.h)||0;
       const m2 = (w*h*qty)/1000000;
       const fiyat = parseFloat(l.fiyat)||0;
       const tutar = m2*fiyat;
       genelTutar += tutar;
-      const vals = { A: i+1, B: w, C: h, D: qty, E: Number(m2.toFixed(4)), F: fiyat, G: Number(tutar.toFixed(2)) };
-      Object.entries(vals).forEach(([col,val])=>{
-        const cell = ws.getCell(`${col}${r}`);
-        styleCell(cell, {font:FONT_TBL_N, align:{h:'center'}, numFmt: (col==='F'||col==='G') ? '#,##0.00' : (col==='E' ? '0.00' : undefined)});
-        cell.value = val;
-      });
-      r += 1;
+      styleCell(ws.getCell(`K${r}`), {font:FONT_TBL_N, align:{h:'center'}, border:false, numFmt:'#,##0.00'});
+      ws.getCell(`K${r}`).value = fiyat;
+      styleCell(ws.getCell(`L${r}`), {font:FONT_TBL_N, align:{h:'center'}, border:false, numFmt:'#,##0.00'});
+      ws.getCell(`L${r}`).value = Number(tutar.toFixed(2));
     });
-    ws.mergeCells(`A${r}:E${r}`);
-    styleCell(ws.getCell(`A${r}`), {font:FONT_TBL, fill:GRAY_FILL, align:{h:'right'}});
-    ws.getCell(`A${r}`).value = 'GENEL TOPLAM';
-    styleCell(ws.getCell(`F${r}`), {font:FONT_TBL, fill:GRAY_FILL});
-    styleCell(ws.getCell(`G${r}`), {font:FONT_TBL, fill:GRAY_FILL, numFmt:'#,##0.00 "TL"'});
-    ws.getCell(`G${r}`).value = Number(genelTutar.toFixed(2));
-    lastUsedRow = r;
+    styleCell(ws.getCell(`K${totalRow}`), {font:FONT_TBL, fill:GRAY_FILL, border:false, align:{h:'right'}});
+    ws.getCell(`K${totalRow}`).value = 'GENEL TOPLAM:';
+    styleCell(ws.getCell(`L${totalRow}`), {font:FONT_TBL, fill:GRAY_FILL, border:false, numFmt:'#,##0.00 "TL"'});
+    ws.getCell(`L${totalRow}`).value = Number(genelTutar.toFixed(2));
   }
   return lastUsedRow;
 }
@@ -3792,7 +3780,7 @@ async function exportOrderToExcelGenel(o, copies){
     }
   });
 
-  ws.columns = [{width:5}, {width:10}, {width:10}, {width:7}, {width:8.86}, {width:12}, {width:16}, {width:18}, {width:2.86}];
+  ws.columns = [{width:5}, {width:10}, {width:10}, {width:7}, {width:8.86}, {width:12}, {width:16}, {width:18}, {width:2.86}, {width:3}, {width:16}, {width:14}];
 
   // Fabrikadaki farklı bölümlere (kesim, temperleme, paketleme vb.) dağıtmak için
   // aynı siparişin formu, istenen kopya sayısı kadar alt alta tekrar basılır —
@@ -3838,7 +3826,7 @@ async function exportOrdersToBulkExcel(selOrders){
       margins:{left:0.3, right:0.3, top:0.3, bottom:0.3, header:0.1, footer:0.1}
     }
   });
-  ws.columns = [{width:5}, {width:10}, {width:10}, {width:7}, {width:8.86}, {width:12}, {width:16}, {width:18}, {width:2.86}];
+  ws.columns = [{width:5}, {width:10}, {width:10}, {width:7}, {width:8.86}, {width:12}, {width:16}, {width:18}, {width:2.86}, {width:3}, {width:16}, {width:14}];
 
   const lastUsedRow = layoutOrderBlocks(wb, ws, selOrders);
   // Bkz. exportOrderToExcelGenel — elle sonradan eklenen not/çizim de yazdırılsın diye pay bırakılıyor.
