@@ -3475,26 +3475,52 @@ function renderReportSection(){
   const el = document.getElementById('reportSection');
   if(!el) return;
   const now = new Date();
-  const thisMonth = orders.filter(o=>{
-    const d = new Date(o.created_at);
-    return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const startOfWeek = new Date(startOfDay);
+  startOfWeek.setDate(startOfWeek.getDate() - ((startOfDay.getDay()+6)%7)); // Pazartesi başlangıç
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const inRange = (o, from) => o.created_at && new Date(o.created_at) >= from;
+  const m2Of = (list) => linesTotalM2(list.flatMap(o=>o.lines||[]));
+
+  const periods = [
+    {label:'Bugün', list: orders.filter(o=>inRange(o, startOfDay))},
+    {label:'Bu hafta', list: orders.filter(o=>inRange(o, startOfWeek))},
+    {label:'Bu ay', list: orders.filter(o=>inRange(o, startOfMonth))},
+    {label:'Toplam', list: orders}
+  ];
+
+  // Cam kalınlığına göre m² dağılımı (tüm zamanlar) — "8mm'den kaç m² sattık" gibi sorulara cevap.
+  const byThickness = {};
+  orders.forEach(o=>{
+    const key = parseKalinlik(o.product_label) || 'Belirsiz';
+    byThickness[key] = (byThickness[key]||0) + linesTotalM2(o.lines||[]);
   });
-  const totalM2All = linesTotalM2(orders.flatMap(o=>o.lines||[]));
-  const totalM2Month = linesTotalM2(thisMonth.flatMap(o=>o.lines||[]));
+  const thicknessEntries = Object.entries(byThickness).sort((a,b)=>b[1]-a[1]);
+
   const bayiCounts = {};
   orders.forEach(o=>{
     const key = o.bayi_adi || o.cust_name || '—';
     bayiCounts[key] = (bayiCounts[key]||0) + 1;
   });
   const topBayi = Object.entries(bayiCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+
   el.innerHTML = `
-    <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin-bottom:16px;">
-      <div><div class="hint">Toplam sipariş</div><div style="font-size:20px; font-weight:800;">${orders.length}</div></div>
-      <div><div class="hint">Toplam m²</div><div style="font-size:20px; font-weight:800;">${fmtM2(totalM2All)}</div></div>
-      <div><div class="hint">Bu ay sipariş</div><div style="font-size:20px; font-weight:800;">${thisMonth.length}</div></div>
-      <div><div class="hint">Bu ay m²</div><div style="font-size:20px; font-weight:800;">${fmtM2(totalM2Month)}</div></div>
+    <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:10px; margin-bottom:16px;">
+      ${periods.map(p=>`
+        <div style="background:var(--surface-2); border-radius:var(--radius-sm); padding:10px 12px;">
+          <div class="hint">${p.label}</div>
+          <div style="font-size:18px; font-weight:800;">${fmtM2(m2Of(p.list))}</div>
+          <div class="hint" style="font-size:11px;">${p.list.length} sipariş</div>
+        </div>
+      `).join('')}
     </div>
-    <div class="hint" style="margin-bottom:6px;">En çok sipariş veren bayiler</div>
+    <div class="hint" style="margin-bottom:6px;">Cam kalınlığına göre m² (toplam)</div>
+    ${thicknessEntries.length===0 ? `<div class="hint">Henüz veri yok.</div>` : thicknessEntries.map(([k,v])=>`
+      <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px;">
+        <span>${k}</span><span style="font-weight:700;">${fmtM2(v)}</span>
+      </div>
+    `).join('')}
+    <div class="hint" style="margin:14px 0 6px;">En çok sipariş veren bayiler</div>
     ${topBayi.length===0 ? `<div class="hint">Henüz veri yok.</div>` : topBayi.map(([name,count],i)=>`
       <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px;">
         <span>${i+1}. ${name}</span><span style="font-weight:700;">${count} sipariş</span>
