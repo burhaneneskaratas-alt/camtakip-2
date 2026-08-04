@@ -691,6 +691,12 @@ function setupOrderProductSelects(prefix){
   updateProductSelect(prefix);
 }
 
+// Kategori adı yazım farklarına (Isıcam / ISI CAM / ISICAM vb.) toleranslı karşılaştırma —
+// boşlukları atıp büyük harfe çevirip kıyaslıyor.
+function isIsicamKategori(k){
+  return (k||'').toLocaleUpperCase('tr').replace(/\s+/g,'') === 'ISICAM';
+}
+
 function updateProductSelect(prefix){
   const catSel = document.getElementById(prefix+'_kategori');
   const prodSel = document.getElementById(prefix+'_urun');
@@ -698,6 +704,18 @@ function updateProductSelect(prefix){
   const kategori = catSel.value;
   const src = productsSource(prefix).filter(p=>p.aktif!==false && p.kategori===kategori);
   prodSel.innerHTML = src.length ? src.map(p=>`<option value="${p.id}">${p.aciklama}</option>`).join('') : `<option value="">Bu kategoride ürün yok</option>`;
+  // "Isıcam siparişi" kutusu sadece seçili kategori Isıcam ise gösterilsin.
+  const wrap = document.getElementById(prefix+'_isicam_wrap');
+  if(wrap){
+    const show = isIsicamKategori(kategori);
+    wrap.style.display = show ? 'block' : 'none';
+    if(!show){
+      const chk = document.getElementById(prefix+'_isicam');
+      const detail = document.getElementById(prefix+'_isicam_detail');
+      if(chk && chk.checked){ chk.checked = false; }
+      if(detail) detail.style.display = 'none';
+    }
+  }
 }
 
 function renderOrderCategorySelect(){
@@ -1023,7 +1041,7 @@ function renderWorkshop(){
         <label>Cam rengi</label>
         <div class="seg" data-group="w_renk"><button data-val="Füme" class="active">Füme</button><button data-val="Şeffaf">Şeffaf</button><button data-val="Mavi">Mavi</button><button data-val="Yeşil">Yeşil</button></div>
       </div>
-      <div class="field" style="margin-bottom:12px;">
+      <div class="field" id="w_isicam_wrap" style="margin-bottom:12px; display:none;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
           <input type="checkbox" id="w_isicam" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;">
           <span>Isıcam siparişi</span>
@@ -2072,7 +2090,7 @@ function renderCustomer(){
         <label>Cam rengi</label>
         <div class="seg" data-group="c_renk"><button data-val="Füme" class="active">Füme</button><button data-val="Şeffaf">Şeffaf</button><button data-val="Mavi">Mavi</button><button data-val="Yeşil">Yeşil</button></div>
       </div>
-      <div class="field" style="margin-bottom:12px;">
+      <div class="field" id="c_isicam_wrap" style="margin-bottom:12px; display:none;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
           <input type="checkbox" id="c_isicam" style="width:16px;height:16px;accent-color:var(--accent);cursor:pointer;">
           <span>Isıcam siparişi</span>
@@ -3478,7 +3496,7 @@ function setBulkPanelTab(tab){
     if(el) el.style.display = key===tab ? 'block' : 'none';
   });
 }
-function isOrderIsicam(o){ return /^Isıcam:/i.test(o.renk||''); }
+function isOrderIsicam(o){ return isIsicamKategori(o.category); }
 let bulkCamTypeTab = 'cam';
 function setBulkCamTypeTab(tab){
   bulkCamTypeTab = tab;
