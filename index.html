@@ -310,6 +310,7 @@ let orders = [];
 let sellers = [];      // müşteri görünümünde seçilecek satıcı/atölye listesi
 let activeFilter = 'all';
 let searchQuery = '';
+let selectedForBulkDelete = new Set();
 let lineState = [];
 let isicamState = {dis: 4, bosluk: 12, ic: 4, renk: 'Şeffaf+Şeffaf'}; // seçili Isıcam
 let editingOrderId = null; // düzenleme modundaysak sipariş id'si, değilse null
@@ -1024,6 +1025,7 @@ function renderWorkshop(){
     </div>
     <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
       <input type="text" id="orderSearch" placeholder="🔍 Bayi/müşteri adına göre ara…" style="flex:1; min-width:200px; padding:9px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text); font-size:13px; outline:none;">
+      <button class="btn btn-ghost btn-sm" id="bulkDeleteBtn" style="display:none; color:var(--danger);">🗑️ Seçilenleri sil (<span id="bulkDeleteCount">0</span>)</button>
     </div>
     <div id="orderList"></div>
     <div id="deliveredSection"></div>
@@ -1033,6 +1035,8 @@ function renderWorkshop(){
     searchQuery = e.target.value;
     renderList(true);
   };
+  document.getElementById('bulkDeleteBtn').onclick = handleBulkDelete;
+  selectedForBulkDelete.clear();
   document.querySelectorAll('#leftPanelToggle button').forEach(b=>{
     b.onclick = ()=> setLeftPanelTab(b.dataset.val);
   });
@@ -3194,8 +3198,10 @@ function orderCardHtml(o, isSellerView, isDelivered){
         <button class="btn btn-ghost deleteBtn" data-id="${o.id}" title="Siparişi sil">🗑️ Sil</button>
       </div>`;
   }
+  const showBulkCheck = isSellerView && !isDelivered && o.status===0;
   return `
     <div class="pane order-card" data-id="${o.id}">
+      ${showBulkCheck ? `<input type="checkbox" class="orderBulkDelCheck" data-id="${o.id}" title="Toplu silmek için seç" ${selectedForBulkDelete.has(String(o.id))?'checked':''} style="position:absolute; top:10px; left:10px; width:16px; height:16px; accent-color:var(--accent); cursor:pointer; z-index:2;">` : ''}
       <div class="order-glyph">${paneGlyph(o.lines)}</div>
       <div class="order-body">
         <div class="order-top"><span class="order-id">#${o.id}</span><span class="order-cust">${o.bayi_adi ? o.bayi_adi + (o.cust_name && o.cust_name!==o.bayi_adi ? ' · 👤 '+o.cust_name : '') : (o.cust_name||'')}</span></div>
@@ -3245,6 +3251,15 @@ function renderList(isSellerView){
       renderStats(); renderFilters(); renderList(isSellerView);
     };
   });
+
+  el.querySelectorAll('.orderBulkDelCheck').forEach(c=>{
+    c.onchange = ()=>{
+      if(c.checked) selectedForBulkDelete.add(c.dataset.id);
+      else selectedForBulkDelete.delete(c.dataset.id);
+      updateBulkDeleteBar();
+    };
+  });
+  updateBulkDeleteBar();
 
   if(isSellerView){
     el.querySelectorAll('.excelBtn').forEach(b=>{
@@ -3335,6 +3350,26 @@ function renderList(isSellerView){
     }
   }
   if(isSellerView){ renderBulkEtiket(); renderBulkAsc(); renderBulkExcel(); }
+}
+
+function updateBulkDeleteBar(){
+  const btn = document.getElementById('bulkDeleteBtn');
+  const countEl = document.getElementById('bulkDeleteCount');
+  if(!btn || !countEl) return;
+  const n = selectedForBulkDelete.size;
+  countEl.textContent = n;
+  btn.style.display = n>0 ? 'inline-flex' : 'none';
+}
+
+async function handleBulkDelete(){
+  const ids = [...selectedForBulkDelete];
+  if(ids.length===0) return;
+  if(!confirm(`${ids.length} siparişi silmek istediğine emin misin? Silinenler'den geri alabilirsin.`)) return;
+  const {data, error} = await sb.from('orders').update({deleted_at: new Date().toISOString()}).in('id', ids).select();
+  if(sbCheckRow(data, error, 'Siparişler silinemedi.')) return;
+  selectedForBulkDelete.clear();
+  await loadOrdersForSeller();
+  renderStats(); renderFilters(); renderList(true);
 }
 
 /* =========================================================
