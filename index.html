@@ -4029,7 +4029,7 @@ const ASC_GAP_510_538 = '0.0     0.0     0.0     0.0 ';   // 28 karakter
 //   177:209 -> "Note 1" = Firma/Bayi adı (örn. "SARAY CAMBALKON")
 //   209:241 -> "Note 2" = Kişi/Müşteri adı (örn. "ADEM")
 //   241:273 -> "Note 3" = parça notu (BACA/MENFEZ vb.) — bu kısım TAHMİNİ, teyit edilmedi
-function ascBuildRow(itemNo, camKoduTip, custCode, w, h, qty, ekBilgi, not1, firma, kisi, girisTarihi, teslimTarihi){
+function ascBuildRow(itemNo, camKoduTip, custCode, w, h, qty, ekBilgi, not1, firma, kisi, girisTarihi, teslimTarihi, compMatCode){
   const itemNoStr4 = ascPadL(itemNo, 4);
   const itemNoStr8 = ascPadL(itemNo, 8);
   let row = '';
@@ -4059,7 +4059,12 @@ function ascBuildRow(itemNo, camKoduTip, custCode, w, h, qty, ekBilgi, not1, fir
   row += ascPadR('', 32);                               // 241:273 — Note 3: bilerek boş (parça notu artık sadece Notes'a yazılıyor)
   row += ' '.repeat(510-273);                           // 273:510 — Note 4+ (kullanılmıyor)
   row += ASC_GAP_510_538;                              // 510:538
-  row += ' '.repeat(367);                              // 538:905
+  // 538:905 — gerçek Optime exportlarıyla doğrulandı: 857:897 arası ekranda görülen
+  // ayrı "Comp. Mat. Code" kutusunun karşılığı (Isıcam'da "4MM FÜME \ 22 \ 4MM FÜME"
+  // gibi tam biçimli birleşik kod burada duruyor; normal camda kalınlık+renk).
+  row += ' '.repeat(319);                              // 538:857 — bilinmiyor, boş
+  row += ascPadR(ascUp(compMatCode||''), 40);          // 857:897 — Comp. Mat. Code
+  row += ' '.repeat(8);                                // 897:905 — dokunma
   row += teslimTarihi;                                 // 905:913
   row += itemNoStr8 + '(null)' + ' '.repeat(122);       // 913:1049
   return row;
@@ -4112,6 +4117,24 @@ function ascCamKodu(o){
   return `${kalinlik}${renk}`.trim();
 }
 
+// Ekranda ayrı gösterilen "Comp. Mat. Code" alanı için TAM biçimli kod (17 karakter
+// sınırı yok, gerçek Optime örneğiyle doğrulandı: "4MM DC \ 22 \ 4MM FÜME" gibi).
+// Optime bu string'i kendi "1st Material / 1st Spacers / 2nd Material" alanlarına
+// otomatik ayrıştırıyor gibi görünüyor.
+function ascCompMatCode(o){
+  const isicamMatch = (o.renk||'').match(/^Isıcam:\s*([\d+]+)\s+(.+)$/i);
+  if(isicamMatch){
+    const yapi = isicamMatch[1].split('+');
+    const renkler = isicamMatch[2].split('+');
+    const t1 = yapi[0] || '', cita = yapi[1] || '', t2 = yapi[2] || yapi[0] || '';
+    const r1 = ascUp(renkler[0]||''), r2 = ascUp(renkler[1]||renkler[0]||'');
+    return `${t1}MM ${r1} \\ ${cita} \\ ${t2}MM ${r2}`;
+  }
+  const kalinlik = parseKalinlik(o.product_label);
+  const renk = ascUp(o.renk || parseCamAdi(o.product_label));
+  return `${kalinlik}${renk}`;
+}
+
 // Bir siparişin parça satırlarını üretir (itemNo startNo'dan başlar) — hem
 // tekli hem toplu ASC aktarımında ortak kullanılıyor
 function ascRowsForOrder(o, startNo){
@@ -4122,6 +4145,7 @@ function ascRowsForOrder(o, startNo){
     ? ascUp(o.asc_customer_code.trim())               // sipariş girilirken elle yazılmışsa onu kullan
     : ascCustCode(firma, kisi);                        // yoksa bayi+müşteri adından otomatik üret
   const camKodu = ascCamKodu(o);
+  const compMatCode = ascCompMatCode(o);
   const ekBilgi = [o.temper, o.edge].filter(Boolean).join(' - ');
   const girisTarihi = ascDDMMYYYY(o.created_at ? o.created_at.slice(0,10) : null);
   const teslimTarihi = ascDDMMYYYY(o.due);
@@ -4143,7 +4167,7 @@ function ascRowsForOrder(o, startNo){
   });
   const pieces = [...gruplar.values(), ...ayriSatirlar];
   if(pieces.length===0) pieces.push({w:0,h:0,qty:1,not1:''});
-  return pieces.map((r,i)=>ascBuildRow(startNo+i, camKodu, custCode, r.w, r.h, r.qty, ekBilgi, r.not1, firma, kisi, girisTarihi, teslimTarihi));
+  return pieces.map((r,i)=>ascBuildRow(startNo+i, camKodu, custCode, r.w, r.h, r.qty, ekBilgi, r.not1, firma, kisi, girisTarihi, teslimTarihi, compMatCode));
 }
 
 // Hazır satırlardan ASC dosyasını indirir (başlık + adet satırı + parça satırları)
