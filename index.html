@@ -3480,7 +3480,12 @@ function renderReportSection(){
   startOfWeek.setDate(startOfWeek.getDate() - ((startOfDay.getDay()+6)%7)); // Pazartesi başlangıç
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
   const inRange = (o, from) => o.created_at && new Date(o.created_at) >= from;
-  const m2Of = (list) => linesTotalM2(list.flatMap(o=>o.lines||[]));
+  // Isıcam (çift cam) siparişte İKİ ayrı cam levhası kesilip kullanılıyor — bu yüzden
+  // raporda (SADECE raporda; Excel/etiket'e hiç dokunulmuyor) m² hesabı Isıcam siparişler
+  // için 2 katı sayılıyor, gerçek üretimde kesilen cam miktarını yansıtsın diye.
+  const isicamMatch = (o)=> (o.renk||'').match(/^Isıcam:\s*([\d.,]+)\+([\d.,]+)\+([\d.,]+)\s+/i);
+  const reportM2ForOrder = (o) => linesTotalM2(o.lines||[]) * (isicamMatch(o) ? 2 : 1);
+  const m2Of = (list) => list.reduce((s,o)=> s + reportM2ForOrder(o), 0);
 
   const periods = [
     {label:'Bugün', list: orders.filter(o=>inRange(o, startOfDay))},
@@ -3490,10 +3495,19 @@ function renderReportSection(){
   ];
 
   // Cam kalınlığına göre m² dağılımı (tüm zamanlar) — "8mm'den kaç m² sattık" gibi sorulara cevap.
+  // Isıcam siparişler her iki cam kalınlığının (dış+iç) kendi kovasına tam alan olarak eklenir.
   const byThickness = {};
   orders.forEach(o=>{
-    const key = parseKalinlik(o.product_label) || 'Belirsiz';
-    byThickness[key] = (byThickness[key]||0) + linesTotalM2(o.lines||[]);
+    const m = isicamMatch(o);
+    const m2 = linesTotalM2(o.lines||[]);
+    if(m){
+      const dis = m[1]+'MM', ic = m[3]+'MM';
+      byThickness[dis] = (byThickness[dis]||0) + m2;
+      byThickness[ic] = (byThickness[ic]||0) + m2;
+    } else {
+      const key = parseKalinlik(o.product_label) || 'Belirsiz';
+      byThickness[key] = (byThickness[key]||0) + m2;
+    }
   });
   const thicknessEntries = Object.entries(byThickness).sort((a,b)=>b[1]-a[1]);
 
