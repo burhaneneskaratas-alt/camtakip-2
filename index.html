@@ -309,8 +309,13 @@ let profile = null;   // {id, full_name, role, workshop_name}
 let orders = [];
 let sellers = [];      // müşteri görünümünde seçilecek satıcı/atölye listesi
 let activeFilter = 'all';
+let thicknessFilter = 'all';
 let searchQuery = '';
 let selectedForBulkDelete = new Set();
+function orderThicknessKey(o){
+  if(isOrderIsicam(o)) return 'ISI CAM';
+  return parseKalinlik(o.product_label) || 'DİĞER';
+}
 let lineState = [];
 let isicamState = {dis: 4, bosluk: 12, ic: 4, renk: 'Şeffaf+Şeffaf'}; // seçili Isıcam
 let editingOrderId = null; // düzenleme modundaysak sipariş id'si, değilse null
@@ -1023,6 +1028,7 @@ function renderWorkshop(){
       <div class="section-eyebrow" style="margin-bottom:0;">Sipariş listesi</div>
       <div class="filter-row" id="filterRow"></div>
     </div>
+    <div class="filter-row" id="thicknessFilterRow" style="margin-bottom:10px;"></div>
     <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
       <input type="text" id="orderSearch" placeholder="🔍 Bayi/müşteri adına göre ara…" style="flex:1; min-width:200px; padding:9px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text); font-size:13px; outline:none;">
       <button class="btn btn-ghost btn-sm" id="bulkDeleteBtn" style="display:none; color:var(--danger);">🗑️ Seçilenleri sil (<span id="bulkDeleteCount">0</span>)</button>
@@ -3156,6 +3162,27 @@ function renderFilters(){
   });
 }
 
+// Sipariş listesinin altındaki kalınlık/kategori filtre çipleri — 4mm/8mm/Isıcam gibi
+// birbirine karışmaması için, sadece o an aktif siparişlerde gerçekten var olan
+// kalınlıklar gösterilir.
+function renderThicknessFilters(){
+  const el = document.getElementById('thicknessFilterRow');
+  if(!el) return;
+  const activeOrders = orders.filter(o=>o.status < DELIVERED_INDEX);
+  const present = new Set(activeOrders.map(orderThicknessKey));
+  if(present.size <= 1){ el.innerHTML = ''; return; }
+  const order = ['4MM','5MM','6MM','8MM','ISI CAM','DİĞER'];
+  const keys = [...present].sort((a,b)=>{
+    const ia = order.indexOf(a), ib = order.indexOf(b);
+    return (ia===-1?99:ia) - (ib===-1?99:ib);
+  });
+  const chips = [{key:'all',label:'Tümü'}, ...keys.map(k=>({key:k,label:k}))];
+  el.innerHTML = chips.map(c=>`<button class="filter-chip ${thicknessFilter===c.key?'active':''}" data-key="${c.key}">${c.label}</button>`).join('');
+  el.querySelectorAll('.filter-chip').forEach(btn=>{
+    btn.onclick = ()=>{ thicknessFilter = btn.dataset.key; renderThicknessFilters(); renderList(true); };
+  });
+}
+
 function orderCardHtml(o, isSellerView, isDelivered){
   const pct = isDelivered ? 100 : (o.status/(STATUSES.length-1))*100;
   const total = linesTotalM2(o.lines||[]);
@@ -3225,6 +3252,8 @@ function renderList(isSellerView){
   const deliveredOrders = orders.filter(o=>o.status === DELIVERED_INDEX);
   let list = activeOrders.slice();
   if(isSellerView && activeFilter !== 'all') list = list.filter(o=>String(o.status)===activeFilter);
+  if(isSellerView && thicknessFilter !== 'all') list = list.filter(o=>orderThicknessKey(o)===thicknessFilter);
+  renderThicknessFilters();
   if(isSellerView && searchQuery.trim()){
     const q = searchQuery.trim().toLocaleLowerCase('tr');
     list = list.filter(o=> `${o.bayi_adi||''} ${o.cust_name||''}`.toLocaleLowerCase('tr').includes(q));
