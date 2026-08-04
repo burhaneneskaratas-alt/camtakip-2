@@ -4114,11 +4114,11 @@ function etiketCamBilgisi(o, l){
 }
 
 // Poz/Delik notu Optime'ın "Notes" alanına yazılırken kullanıcının belirttiği kurala göre kısaltılır:
-// "Menfez" geçiyorsa "MNF", "delik/delikli" geçiyorsa "DLK", başka bir şeyse olduğu gibi kopyalanır.
+// içinde "delik" veya "baca" geçiyorsa "DLK" yazılır, başka her şey (düz, menfez, vb.)
+// kullanıcının yazdığı hâliyle aynen kopyalanır — sadece delik/baca kısaltılır.
 function ascNotesKisalt(note){
   if(!note) return '';
   const n = note.toLocaleLowerCase('tr');
-  if(n.includes('menfez')) return 'MNF';
   if(n.includes('delik') || n.includes('baca')) return 'DLK';
   return note;
 }
