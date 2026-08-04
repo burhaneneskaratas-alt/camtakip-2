@@ -1068,38 +1068,49 @@ function renderWorkshop(){
         <span class="hint" id="w_status"></span>
       </div>
     </div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px;">
+      <div class="pane" style="padding:18px 20px;">
+        <div class="seg" id="leftPanelToggle" style="margin-bottom:14px; max-width:fit-content;">
+          <button data-val="rapor" class="active">📊 Rapor</button>
+          <button data-val="silinenler">🗑️ Silinenler</button>
+        </div>
+        <div id="reportSection"></div>
+        <div id="trashSection" style="display:none;"></div>
+      </div>
+      <div class="pane" style="padding:18px 20px;">
+        <div style="font-family:var(--font-display); font-weight:700; font-size:13px; margin-bottom:12px;">📤 Toplu İşlemler</div>
+        <div class="seg" id="bulkPanelToggle" style="margin-bottom:14px; max-width:fit-content;">
+          <button data-val="etiket" class="active">🏷️ Etiket</button>
+          <button data-val="excel">📊 Excel</button>
+          <button data-val="asc">📋 ASC</button>
+        </div>
+        <div id="bulkEtiketSection"></div>
+        <div id="bulkExcelSection" style="display:none;"></div>
+        <div id="bulkAscSection" style="display:none;"></div>
+      </div>
+    </div>
     <div class="list-head">
       <div class="section-eyebrow" style="margin-bottom:0;">Sipariş listesi</div>
       <div class="filter-row" id="filterRow"></div>
     </div>
     <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
       <input type="text" id="orderSearch" placeholder="🔍 Bayi/müşteri adına göre ara…" style="flex:1; min-width:200px; padding:9px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text); font-size:13px; outline:none;">
-      <button class="btn btn-ghost btn-sm" id="reportBtn">📊 Rapor</button>
-      <button class="btn btn-ghost btn-sm" id="trashBtn">🗑️ Silinenler</button>
     </div>
     <div id="orderList"></div>
-    <div id="trashSection" style="display:none;"></div>
-    <div id="reportSection" style="display:none;"></div>
     <div id="deliveredSection"></div>
-    <details class="pane collapsible" style="margin-top:26px;">
-      <summary>📤 Toplu İşlemler <span class="hint">(Etiket / Excel / ASC — birden fazla siparişi birleştir)</span></summary>
-      <div class="collapsible-body">
-        <div class="section-eyebrow" style="margin-top:0;">Toplu Etiket Yazdır — birden fazla siparişin etiketlerini tek sayfa dizisinde bas (fire azalt)</div>
-        <div id="bulkEtiketSection"></div>
-        <div class="section-eyebrow">Toplu Excel Aktar — birden fazla siparişi tek dosyada alt alta birleştir (A4'e sığdığı kadar yan yana/alt alta basılır)</div>
-        <div id="bulkExcelSection"></div>
-        <div class="section-eyebrow">Toplu ASC aktar (Optime) — aynı cam tipindeki bekleyen siparişleri birleştir</div>
-        <div id="bulkAscSection"></div>
-      </div>
-    </details>
   `;
   document.getElementById('logoutBtn').onclick = handleLogout;
   document.getElementById('orderSearch').oninput = (e)=>{
     searchQuery = e.target.value;
     renderList(true);
   };
-  document.getElementById('trashBtn').onclick = toggleTrashSection;
-  document.getElementById('reportBtn').onclick = toggleReportSection;
+  document.querySelectorAll('#leftPanelToggle button').forEach(b=>{
+    b.onclick = ()=> setLeftPanelTab(b.dataset.val);
+  });
+  document.querySelectorAll('#bulkPanelToggle button').forEach(b=>{
+    b.onclick = ()=> setBulkPanelTab(b.dataset.val);
+  });
+  renderReportSection();
   renderCatalogSection();
   document.getElementById('s_save').onclick = saveCompanyInfo;
   initSeg('w_temper');
@@ -3397,21 +3408,11 @@ function renderList(isSellerView){
 /* =========================================================
    SİLİNENLER (soft-delete arşivi)
    ========================================================= */
-let trashVisible = false;
-async function toggleTrashSection(){
-  trashVisible = !trashVisible;
-  const el = document.getElementById('trashSection');
-  if(!el) return;
-  el.style.display = trashVisible ? 'block' : 'none';
-  if(trashVisible){ await loadDeletedOrdersForSeller(); renderTrashSection(); }
-}
 function renderTrashSection(){
   const el = document.getElementById('trashSection');
   if(!el) return;
   el.innerHTML = `
-    <div class="list-head" style="margin-top:26px;">
-      <div class="section-eyebrow" style="margin-bottom:0;">Silinenler <span class="hint">(${deletedOrders.length})</span></div>
-    </div>
+    <div class="hint" style="margin-bottom:10px;">Silinenler (${deletedOrders.length})</div>
     ${deletedOrders.length===0
       ? `<div class="pane empty-state"><div style="font-size:13px;">Silinmiş sipariş yok.</div></div>`
       : deletedOrders.map(o=>`
@@ -3449,13 +3450,26 @@ function renderTrashSection(){
 /* =========================================================
    RAPOR — satıcı için basit özet istatistikler
    ========================================================= */
-let reportVisible = false;
-function toggleReportSection(){
-  reportVisible = !reportVisible;
-  const el = document.getElementById('reportSection');
-  if(!el) return;
-  el.style.display = reportVisible ? 'block' : 'none';
-  if(reportVisible) renderReportSection();
+let leftPanelTab = 'rapor';
+async function setLeftPanelTab(tab){
+  leftPanelTab = tab;
+  document.querySelectorAll('#leftPanelToggle button').forEach(b=> b.classList.toggle('active', b.dataset.val===tab));
+  const reportEl = document.getElementById('reportSection');
+  const trashEl = document.getElementById('trashSection');
+  if(reportEl) reportEl.style.display = tab==='rapor' ? 'block' : 'none';
+  if(trashEl) trashEl.style.display = tab==='silinenler' ? 'block' : 'none';
+  if(tab==='rapor') renderReportSection();
+  else { await loadDeletedOrdersForSeller(); renderTrashSection(); }
+}
+let bulkPanelTab = 'etiket';
+function setBulkPanelTab(tab){
+  bulkPanelTab = tab;
+  document.querySelectorAll('#bulkPanelToggle button').forEach(b=> b.classList.toggle('active', b.dataset.val===tab));
+  const map = {etiket:'bulkEtiketSection', excel:'bulkExcelSection', asc:'bulkAscSection'};
+  Object.entries(map).forEach(([key,id])=>{
+    const el = document.getElementById(id);
+    if(el) el.style.display = key===tab ? 'block' : 'none';
+  });
 }
 function renderReportSection(){
   const el = document.getElementById('reportSection');
@@ -3474,23 +3488,18 @@ function renderReportSection(){
   });
   const topBayi = Object.entries(bayiCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
   el.innerHTML = `
-    <div class="list-head" style="margin-top:26px;">
-      <div class="section-eyebrow" style="margin-bottom:0;">Rapor</div>
+    <div style="display:grid; grid-template-columns:repeat(2,1fr); gap:14px; margin-bottom:16px;">
+      <div><div class="hint">Toplam sipariş</div><div style="font-size:20px; font-weight:800;">${orders.length}</div></div>
+      <div><div class="hint">Toplam m²</div><div style="font-size:20px; font-weight:800;">${fmtM2(totalM2All)}</div></div>
+      <div><div class="hint">Bu ay sipariş</div><div style="font-size:20px; font-weight:800;">${thisMonth.length}</div></div>
+      <div><div class="hint">Bu ay m²</div><div style="font-size:20px; font-weight:800;">${fmtM2(totalM2Month)}</div></div>
     </div>
-    <div class="pane form-card">
-      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-bottom:16px;">
-        <div><div class="hint">Toplam sipariş</div><div style="font-size:22px; font-weight:800;">${orders.length}</div></div>
-        <div><div class="hint">Toplam m²</div><div style="font-size:22px; font-weight:800;">${fmtM2(totalM2All)}</div></div>
-        <div><div class="hint">Bu ay sipariş</div><div style="font-size:22px; font-weight:800;">${thisMonth.length}</div></div>
-        <div><div class="hint">Bu ay m²</div><div style="font-size:22px; font-weight:800;">${fmtM2(totalM2Month)}</div></div>
+    <div class="hint" style="margin-bottom:6px;">En çok sipariş veren bayiler</div>
+    ${topBayi.length===0 ? `<div class="hint">Henüz veri yok.</div>` : topBayi.map(([name,count],i)=>`
+      <div style="display:flex; justify-content:space-between; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px;">
+        <span>${i+1}. ${name}</span><span style="font-weight:700;">${count} sipariş</span>
       </div>
-      <div class="section-eyebrow">En çok sipariş veren bayiler</div>
-      ${topBayi.length===0 ? `<div class="hint">Henüz veri yok.</div>` : topBayi.map(([name,count],i)=>`
-        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:13.5px;">
-          <span>${i+1}. ${name}</span><span style="font-weight:700;">${count} sipariş</span>
-        </div>
-      `).join('')}
-    </div>
+    `).join('')}
   `;
 }
 
