@@ -4438,6 +4438,16 @@ function ascGroupKeyForOrder(o){
   return ascCamKodu(o) || 'BELİRSİZ CAM TİPİ';
 }
 
+// Isıcam sekmesinde çıta/kalınlığa göre değil, SADECE renk kombinasyonuna göre gruplanır
+// (Füme+Füme bir kutu, Şeffaf+Şeffaf bir kutu, Füme+Şeffaf bir kutu — çıta farkı önemsiz).
+function ascColorGroupKeyForOrder(o){
+  const m = (o.renk||'').match(/^Isıcam:\s*[\d+]+\s+(.+)$/i);
+  if(!m) return ascGroupKeyForOrder(o);
+  const renkler = m[1].split('+').map(r=>ascUp(r.trim()));
+  renkler.sort((a,b)=>a.localeCompare(b,'tr'));
+  return renkler.join('+');
+}
+
 function orderPieceCount(o){
   return (o.lines||[]).reduce((s,l)=>s+(parseInt(l.qty)||1), 0);
 }
@@ -4453,7 +4463,7 @@ function renderBulkAsc(){
   el.querySelectorAll('.bulkAscCheck').forEach(c=>{ prevChecked[c.dataset.id] = c.checked; });
   const groups = {};
   active.forEach(o=>{
-    const key = ascGroupKeyForOrder(o);
+    const key = isIsicamTab ? ascColorGroupKeyForOrder(o) : ascGroupKeyForOrder(o);
     (groups[key] = groups[key] || []).push(o);
   });
   const keys = Object.keys(groups).sort();
