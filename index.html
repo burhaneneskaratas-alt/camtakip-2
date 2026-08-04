@@ -214,6 +214,19 @@
       <div class="field"><label>Adet</label><input id="dm_qty" type="number" value="1"></div>
     </div>
 
+    <div class="field" style="margin-bottom:10px;">
+      <label>Hazır şablon (En/Boy'u girdikten sonra seç)</label>
+      <select id="dm_template">
+        <option value="">— Şablon seç —</option>
+        <option value="kol2">Çift Kol Delikli</option>
+        <option value="mentese6">Menteşe Delikli — 6 Delikli</option>
+        <option value="mentese8">Menteşe Delikli — 8 Delikli</option>
+        <option value="mentesekol">Menteşe + Çift Kol Delikli</option>
+        <option value="aski4">Askı Delikli</option>
+        <option value="askikol">Askı + Çift Kol Delikli</option>
+      </select>
+    </div>
+
     <div class="hint" style="display:block; margin-bottom:6px; text-align:center;">Önizleme (mevcut bir deliğe tıklayıp menfez yönü/silme seçebilirsin):</div>
     <div style="display:flex; justify-content:center; margin-bottom:10px;">
       <canvas id="dm_canvas" width="220" height="280" style="background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); max-width:100%;"></canvas>
@@ -2803,6 +2816,7 @@ function openDelikEditor(lineIdx){
   document.getElementById('dm_note').value = l ? (l.note||'') : '';
   document.getElementById('dm_ust').value = '';
   document.getElementById('dm_yatay').value = '';
+  document.getElementById('dm_template').value = '';
   dmSetSide('sol');
   document.getElementById('dm_overlay').style.display = 'flex';
   document.getElementById('dm_dirRow').style.display = 'none';
@@ -2905,6 +2919,65 @@ document.getElementById('dm_addDelik').onclick = function(){
   renderDmList();
   document.getElementById('dm_dirRow').style.display = 'flex';
   updateDmDirButtons();
+};
+
+// ====================================================================
+// HAZIR DELİK ŞABLONLARI — atölyenin çizimlerinden alınan sabit ölçüler.
+// Tüm ölçüler mm; "ust" = üstten mesafe, "yatay" = ilgili kenardan (side) mesafe.
+// Kol delikleri her zaman camın boyuna göre ortalanır (boydan merkez delinecek).
+// ====================================================================
+function dmMenteseHoles(count){
+  const holes = [{ust:300, yatay:20, side:'sol'}];
+  let ust = 300;
+  for(let i=0;i<count-1;i++){
+    ust += (i%2===0 ? 24 : 45);
+    holes.push({ust, yatay:20, side:'sol'});
+  }
+  return holes;
+}
+function dmAskiHoles(h){
+  return [
+    {ust:17, yatay:80, side:'sol'},
+    {ust:17, yatay:80, side:'sag'},
+    {ust:h-17, yatay:80, side:'sol'},
+    {ust:h-17, yatay:80, side:'sag'}
+  ];
+}
+function dmKolHoles(h, offset){
+  return [
+    {ust:h/2-80, yatay:offset, side:'sag'},
+    {ust:h/2+80, yatay:offset, side:'sag'}
+  ];
+}
+const DM_TEMPLATE_BUILDERS = {
+  kol2: (w,h)=> dmKolHoles(h, 50),
+  mentese6: (w,h)=> dmMenteseHoles(6),
+  mentese8: (w,h)=> dmMenteseHoles(8),
+  mentesekol: (w,h)=> dmMenteseHoles(6).concat(dmKolHoles(h,100)),
+  aski4: (w,h)=> dmAskiHoles(h),
+  askikol: (w,h)=> dmAskiHoles(h).concat(dmKolHoles(h,50))
+};
+function applyDmTemplate(key){
+  const w = parseFloat(document.getElementById('dm_w').value);
+  const h = parseFloat(document.getElementById('dm_h').value);
+  if(!w || !h){ alert('Önce En ve Boy değerlerini gir.'); return; }
+  const builder = DM_TEMPLATE_BUILDERS[key];
+  if(!builder) return;
+  dmCtx.dm = builder(w,h).map(p=>({
+    x: p.side==='sag' ? Math.min(Math.max(1-(p.yatay/w),0),1) : Math.min(Math.max(p.yatay/w,0),1),
+    y: Math.min(Math.max(p.ust/h,0),1),
+    ust: p.ust, yatay: p.yatay, side: p.side, dirs: []
+  }));
+  dmCtx.selected = null;
+  drawDmCanvas();
+  renderDmList();
+  document.getElementById('dm_dirRow').style.display = 'none';
+}
+document.getElementById('dm_template').onchange = function(){
+  const key = this.value;
+  this.value = '';
+  if(!key) return;
+  applyDmTemplate(key);
 };
 
 function updateDmDirButtons(){
