@@ -3962,7 +3962,11 @@ function ascBuildRow(itemNo, camKoduTip, custCode, w, h, qty, ekBilgi, not1, fir
   row += '(null)';                                      // 73:79
   row += ascNum1(w, 10);                               // 79:89
   row += ascNum1(h, 8);                                // 89:97
-  row += ascPadR('', 43);                              // 97:140 — BOŞ BIRAKILIYOR: gerçek testte bu alana yazı yazılınca Note1/Note2 okunmuyordu, kanıtlandı
+  // 97:140 — gerçek Optime exportlarıyla (birebir karşılaştırma) doğrulandı:
+  // ilk 8 karakter (97:105) boş kalmalı (dokununca Note1/Note2 bozuluyor, kanıtlı),
+  // 105:140 arası ise Optime'ın TEKLİ "Notes" kutusunun karşılığı.
+  row += ascPadR('', 8);                               // 97:105 — dokunma
+  row += ascPadR(ascUp(not1), 35);                     // 105:140 — Notes kutusu
   row += ASC_GAP_140_158;                              // 140:158
   row += girisTarihi;                                  // 158:166
   row += ASC_GAP_166_174;                              // 166:174
