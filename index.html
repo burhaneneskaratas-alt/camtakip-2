@@ -3973,7 +3973,7 @@ function ascBuildRow(itemNo, camKoduTip, custCode, w, h, qty, ekBilgi, not1, fir
   row += '0.0';                                        // 174:177
   row += ascPadR(ascUp(firma), 32);                    // 177:209 — Note 1: firma/bayi adı (DOĞRULANDI)
   row += ascPadR(ascUp(kisi), 32);                      // 209:241 — Note 2: kişi/müşteri adı (DOĞRULANDI)
-  row += ascPadR(ascUp(not1), 32);                      // 241:273 — Note 3: parça notu (tahmini)
+  row += ascPadR('', 32);                               // 241:273 — Note 3: bilerek boş (parça notu artık sadece Notes'a yazılıyor)
   row += ' '.repeat(510-273);                           // 273:510 — Note 4+ (kullanılmıyor)
   row += ASC_GAP_510_538;                              // 510:538
   row += ' '.repeat(367);                              // 538:905
@@ -4118,11 +4118,12 @@ function etiketCamBilgisi(o, l){
 }
 
 // Poz/Delik notu Optime'ın "Notes" alanına yazılırken kullanıcının belirttiği kurala göre kısaltılır:
-// içinde "delik" veya "baca" geçiyorsa "DLK" yazılır, başka her şey (düz, menfez, vb.)
-// kullanıcının yazdığı hâliyle aynen kopyalanır — sadece delik/baca kısaltılır.
+// "menfez" geçiyorsa "MNF", "delik" veya "baca" geçiyorsa "DLK", başka her şey (örn. "düz")
+// kullanıcının yazdığı hâliyle aktarılır (büyük harfe çevirme zaten ascBuildRow'da ascUp ile yapılıyor).
 function ascNotesKisalt(note){
   if(!note) return '';
   const n = note.toLocaleLowerCase('tr');
+  if(n.includes('menfez')) return 'MNF';
   if(n.includes('delik') || n.includes('baca')) return 'DLK';
   return note;
 }
