@@ -3611,7 +3611,7 @@ async function exportOrderToExcelGenel(o, copies){
   // Yazdırma alanı içeriğin bittiği satırdan biraz daha aşağıya kadar (+25 satır) açık
   // bırakılıyor — dosya indirildikten sonra Excel'de elle not/şekil/çizim eklenirse
   // (örn. şekilli camın taslağı) o da yazdırma alanına girsin diye.
-  ws.pageSetup.printArea = `A1:I${lastUsedRow + 25}`;
+  ws.pageSetup.printArea = `A1:I${lastUsedRow + 1000}`;
 
   const bayiAdi = safeFilenamePart(o.bayi_adi || o.cust_name || 'Bayi');
   const musteriAdi = safeFilenamePart(o.cust_name || 'Müşteri');
@@ -3651,7 +3651,7 @@ async function exportOrdersToBulkExcel(selOrders){
 
   const lastUsedRow = layoutOrderBlocks(wb, ws, selOrders);
   // Bkz. exportOrderToExcelGenel — elle sonradan eklenen not/çizim de yazdırılsın diye pay bırakılıyor.
-  ws.pageSetup.printArea = `A1:I${lastUsedRow + 25}`;
+  ws.pageSetup.printArea = `A1:I${lastUsedRow + 1000}`;
 
   const tarihStr = safeFilenamePart(new Date().toLocaleDateString('tr-TR'));
   await downloadWorkbook(wb, `Toplu Siparis ${tarihStr} (${selOrders.length} adet).xlsx`);
