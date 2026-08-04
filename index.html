@@ -3981,7 +3981,10 @@ function buildEtiketHtmlForOrder(o){
       <div class="etk-olcu">${l.w} × ${l.h} <span class="etk-mm">mm</span> <span class="etk-sayac">${i+1}/${adet}</span></div>
       <div class="etk-cam">${[camRengi, camOzelligi].filter(Boolean).join(' · ')}</div>
       <div class="etk-bottom">
-        <div class="etk-sekil">ŞEKİL${sekilMetni ? ': '+sekilMetni : ''}</div>
+        <div class="etk-sekil">
+          ŞEKİL${sekilMetni ? ': '+sekilMetni : ''}
+          ${l.sekilFotoUrl ? `<img src="${l.sekilFotoUrl}" class="etk-sekil-foto">` : ''}
+        </div>
         <div class="etk-sekildelik">
           <div class="etk-delik-buyuk">${delik.deger ? delik.etiket+': '+delik.deger : delik.etiket}</div>
         </div>
@@ -4020,6 +4023,7 @@ function openEtiketPrintWindow(etiketHtml){
       .etk-cam { font-size: 15px; font-weight:700; color:#333; }
       .etk-bottom { display:flex; justify-content:space-between; align-items:flex-end; margin-top:3mm; }
       .etk-sekil { font-size: 13px; font-weight:700; color:#333; }
+      .etk-sekil-foto { display:block; max-width:20mm; max-height:16mm; margin-top:1mm; object-fit:contain; border:1px solid #999; }
       .etk-sekildelik { text-align:right; margin-right:4mm; }
       .etk-delik-buyuk { font-size: 16px; font-weight:800; }
       .etk-altfirma { margin-top:auto; margin-bottom:2.5mm; padding-top:2mm; }
