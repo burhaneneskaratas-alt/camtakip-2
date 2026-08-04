@@ -3954,7 +3954,7 @@ function ascBuildRow(itemNo, camKoduTip, custCode, w, h, qty, ekBilgi, not1, fir
   // sapınca (Isıcam kodu için genişletilmişti) Optime import hatası verdi, geri alındı.
   row += ascPadR(camKoduTip, 17) + itemNoStr4;        // 0:21
   row += ascPadR(ascUp(custCode), 20);                 // 21:41 (Optime'daki "Customer" kısa kodu)
-  row += ascPadR(ascUp(not1), 12);                     // 41:53 — DENEME: tek "Notes" kutusu burası olabilir mi diye test ediliyor
+  row += ascPadR('', 12);                              // 41:53 (bilinmiyor) — denendi, Notes kutusuna yansımadı, boş bırakılıyor
   row += ascPadL('1.0', 3);                            // 53:56
   row += ' '.repeat(7);                                // 56:63
   row += '0Y';                                         // 63:65
