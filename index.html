@@ -218,12 +218,11 @@
       <label>Hazır şablon (En/Boy'u girdikten sonra seç)</label>
       <select id="dm_template">
         <option value="">— Şablon seç —</option>
-        <option value="kol2">Çift Kol Delikli</option>
-        <option value="mentese6">Menteşe Delikli — 6 Delikli</option>
-        <option value="mentese8">Menteşe Delikli — 8 Delikli</option>
-        <option value="mentesekol">Menteşe + Çift Kol Delikli</option>
-        <option value="aski4">Askı Delikli</option>
-        <option value="askikol">Askı + Çift Kol Delikli</option>
+        <option value="kol2">Çift Kol Delikli (2)</option>
+        <option value="aski4">Askı Delikli (4)</option>
+        <option value="askikol">Askı + Çift Kol Delikli (6)</option>
+        <option value="mentese6">Menteşe + Çift Kol — 6 Delikli</option>
+        <option value="mentese8">Menteşe + Çift Kol — 8 Delikli</option>
       </select>
     </div>
 
@@ -2926,14 +2925,25 @@ document.getElementById('dm_addDelik').onclick = function(){
 // Tüm ölçüler mm; "ust" = üstten mesafe, "yatay" = ilgili kenardan (side) mesafe.
 // Kol delikleri her zaman camın boyuna göre ortalanır (boydan merkez delinecek).
 // ====================================================================
-function dmMenteseHoles(count){
-  const holes = [{ust:300, yatay:20, side:'sol'}];
-  let ust = 300;
-  for(let i=0;i<count-1;i++){
-    ust += (i%2===0 ? 24 : 45);
-    holes.push({ust, yatay:20, side:'sol'});
-  }
+// Bir menteşe = 2 delik, aralarında sabit 45mm, kenardan sabit 24mm.
+// hingeStarts: her menteşenin ÜST deliğinin "ust" (mm) değerleri.
+function dmMenteseCiftleri(hingeStarts){
+  const holes = [];
+  hingeStarts.forEach(start=>{
+    holes.push({ust:start, yatay:24, side:'sol'});
+    holes.push({ust:start+45, yatay:24, side:'sol'});
+  });
   return holes;
+}
+// N menteşe: ilki üstten 300mm, sonuncusu alttan 300mm biter, aradakiler
+// (varsa) camın boyuna göre eşit aralıklarla ortalanır.
+function dmMenteseHoles(n, h){
+  const first = 300, last = h - 345;
+  if(n === 1) return dmMenteseCiftleri([first]);
+  const starts = [first];
+  for(let i=1;i<n-1;i++) starts.push(first + (last-first)*i/(n-1));
+  starts.push(last);
+  return dmMenteseCiftleri(starts);
 }
 function dmAskiHoles(h){
   return [
@@ -2951,11 +2961,10 @@ function dmKolHoles(h, offset){
 }
 const DM_TEMPLATE_BUILDERS = {
   kol2: (w,h)=> dmKolHoles(h, 50),
-  mentese6: (w,h)=> dmMenteseHoles(6),
-  mentese8: (w,h)=> dmMenteseHoles(8),
-  mentesekol: (w,h)=> dmMenteseHoles(6).concat(dmKolHoles(h,100)),
   aski4: (w,h)=> dmAskiHoles(h),
-  askikol: (w,h)=> dmAskiHoles(h).concat(dmKolHoles(h,50))
+  askikol: (w,h)=> dmAskiHoles(h).concat(dmKolHoles(h,50)),
+  mentese6: (w,h)=> dmMenteseHoles(2,h).concat(dmKolHoles(h,100)),
+  mentese8: (w,h)=> dmMenteseHoles(3,h).concat(dmKolHoles(h,100))
 };
 function applyDmTemplate(key){
   const w = parseFloat(document.getElementById('dm_w').value);
