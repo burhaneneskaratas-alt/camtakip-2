@@ -40,6 +40,11 @@
   .pane{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); position:relative;}
   .pane::before, .pane::after{content:none;}
   .form-card{padding:22px 22px 20px; margin-bottom:20px;}
+  details.collapsible{padding:0;}
+  details.collapsible summary{cursor:pointer; padding:14px 20px; font-family:var(--font-display); font-weight:700; font-size:13.5px; color:var(--text); list-style:revert; user-select:none;}
+  details.collapsible summary:hover{color:var(--accent);}
+  details.collapsible summary .hint{font-weight:500; margin-left:4px;}
+  details.collapsible .collapsible-body{padding:0 20px 20px;}
   .field-grid{display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:12px;}
   .field-grid.two{grid-template-columns:1fr 1fr;}
   .field-grid.three{grid-template-columns:1fr 1fr 1fr;}
@@ -966,24 +971,28 @@ function renderCatalogSection(){
 function renderWorkshop(){
   app.innerHTML = `
     ${topbarHtml()}
-    <div class="section-eyebrow">Firma bilgileri (Excel çıktısında kullanılır)</div>
-    <div class="pane form-card" style="padding-bottom:16px;">
-      <div class="field-grid two">
-        <div class="field"><label for="s_email">E-posta</label><input id="s_email" type="text" placeholder="siparis@atolyeniz.com" value="${profile.company_email||''}"></div>
-        <div class="field"><label for="s_phone">Telefon</label><input id="s_phone" type="text" placeholder="0532 000 00 00" value="${profile.company_phone||''}"></div>
+    <details class="pane collapsible" style="margin-bottom:14px;">
+      <summary>⚙️ Firma bilgileri <span class="hint">(Excel çıktısında kullanılır)</span></summary>
+      <div class="collapsible-body">
+        <div class="field-grid two">
+          <div class="field"><label for="s_email">E-posta</label><input id="s_email" type="text" placeholder="siparis@atolyeniz.com" value="${profile.company_email||''}"></div>
+          <div class="field"><label for="s_phone">Telefon</label><input id="s_phone" type="text" placeholder="0532 000 00 00" value="${profile.company_phone||''}"></div>
+        </div>
+        <div class="field-grid two">
+          <div class="field"><label for="s_web">Web</label><input id="s_web" type="text" placeholder="www.atolyeniz.com" value="${profile.company_web||''}"></div>
+          <div class="field"><label for="s_addr">Adres</label><input id="s_addr" type="text" placeholder="Atölye adresiniz" value="${profile.company_address||''}"></div>
+        </div>
+        <div class="form-actions">
+          <button class="btn btn-sm" id="s_save">Firma bilgilerini kaydet</button>
+          <span class="hint" id="s_status"></span>
+        </div>
       </div>
-      <div class="field-grid two">
-        <div class="field"><label for="s_web">Web</label><input id="s_web" type="text" placeholder="www.atolyeniz.com" value="${profile.company_web||''}"></div>
-        <div class="field"><label for="s_addr">Adres</label><input id="s_addr" type="text" placeholder="Atölye adresiniz" value="${profile.company_address||''}"></div>
-      </div>
-      <div class="form-actions">
-        <button class="btn btn-sm" id="s_save">Firma bilgilerini kaydet</button>
-        <span class="hint" id="s_status"></span>
-      </div>
-    </div>
+    </details>
     <div class="stat-strip" id="statStrip"></div>
-    <div class="section-eyebrow">Ürün kataloğu</div>
-    <div class="pane form-card" id="catalogBody" style="margin-bottom:20px;"></div>
+    <details class="pane collapsible" style="margin-bottom:20px;">
+      <summary>📦 Ürün kataloğu</summary>
+      <div class="collapsible-body" id="catalogBody"></div>
+    </details>
     <div class="section-eyebrow">Hızlı sipariş ekle</div>
     <div class="pane form-card">
       <div class="field-grid three">
@@ -1038,7 +1047,6 @@ function renderWorkshop(){
         </div>
       </div>
       <div class="field" style="margin-bottom:6px;"><label>Ölçüler</label></div>
-      <div class="field" style="margin-bottom:6px;"><label>Ölçüler</label></div>
       <div class="lines-wrap">
         <div class="line-labels"><span>En (mm)</span><span>Boy (mm)</span><span>Adet</span><span>Delik/Poz</span><span></span><span>m²</span><span>Isıcam</span><span></span><span></span></div>
         <div id="w_lines"></div>
@@ -1073,12 +1081,17 @@ function renderWorkshop(){
     <div id="trashSection" style="display:none;"></div>
     <div id="reportSection" style="display:none;"></div>
     <div id="deliveredSection"></div>
-    <div class="section-eyebrow" style="margin-top:26px;">Toplu Etiket Yazdır — birden fazla siparişin etiketlerini tek sayfa dizisinde bas (fire azalt)</div>
-    <div id="bulkEtiketSection"></div>
-    <div class="section-eyebrow" style="margin-top:26px;">Toplu Excel Aktar — birden fazla siparişi tek dosyada alt alta birleştir (A4'e sığdığı kadar yan yana/alt alta basılır)</div>
-    <div id="bulkExcelSection"></div>
-    <div class="section-eyebrow" style="margin-top:26px;">Toplu ASC aktar (Optime) — aynı cam tipindeki bekleyen siparişleri birleştir</div>
-    <div id="bulkAscSection"></div>
+    <details class="pane collapsible" style="margin-top:26px;">
+      <summary>📤 Toplu İşlemler <span class="hint">(Etiket / Excel / ASC — birden fazla siparişi birleştir)</span></summary>
+      <div class="collapsible-body">
+        <div class="section-eyebrow" style="margin-top:0;">Toplu Etiket Yazdır — birden fazla siparişin etiketlerini tek sayfa dizisinde bas (fire azalt)</div>
+        <div id="bulkEtiketSection"></div>
+        <div class="section-eyebrow">Toplu Excel Aktar — birden fazla siparişi tek dosyada alt alta birleştir (A4'e sığdığı kadar yan yana/alt alta basılır)</div>
+        <div id="bulkExcelSection"></div>
+        <div class="section-eyebrow">Toplu ASC aktar (Optime) — aynı cam tipindeki bekleyen siparişleri birleştir</div>
+        <div id="bulkAscSection"></div>
+      </div>
+    </details>
   `;
   document.getElementById('logoutBtn').onclick = handleLogout;
   document.getElementById('orderSearch').oninput = (e)=>{
