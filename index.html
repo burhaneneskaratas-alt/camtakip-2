@@ -3842,31 +3842,46 @@ function renderBulkExcel(){
   const el = document.getElementById('bulkExcelSection');
   if(!el) return;
   const active = orders.filter(o=>o.status < DELIVERED_INDEX);
+  // Mevcut işaretleme durumunu koru — arama/filtre değişince (bu fonksiyon her renderList'te
+  // yeniden çağrılıyor) kullanıcının elle kaldırdığı tikler geri gelmesin.
+  const prevChecked = {};
+  el.querySelectorAll('.bulkExcelCheck').forEach(c=>{ prevChecked[c.dataset.id] = c.checked; });
   if(active.length===0){
     el.innerHTML = `<div class="pane empty-state"><div style="font-size:13px;">Birleştirilecek bekleyen sipariş yok.</div></div>`;
     return;
   }
-  el.innerHTML = `
-    <div class="pane form-card">
-      <div class="bulk-asc-head">
-        <span class="hint" id="bulkExcelCount">${active.length} sipariş seçili</span>
-        <button class="btn btn-ghost btn-sm" id="bulkExcelToggleAll">Tümünü seç/kaldır</button>
-        <button class="btn btn-primary btn-sm" id="bulkExcelDownload">Excel olarak indir</button>
-      </div>
+  // ASC bölümündeki gibi, siparişler cam kalınlığına göre (8mm/6mm/5mm vb.) gruplanıp
+  // ayrı kutular hâlinde gösteriliyor.
+  const groups = {};
+  active.forEach(o=>{
+    const key = parseKalinlik(o.product_label) || 'BELİRSİZ KALINLIK';
+    (groups[key] = groups[key] || []).push(o);
+  });
+  const keys = Object.keys(groups).sort();
+  el.innerHTML = keys.map(key=>`
+    <div class="pane form-card bulk-asc-group" style="margin-bottom:14px;">
+      <div class="bulk-asc-head"><b>${key}</b><span class="hint">${groups[key].length} sipariş</span></div>
       <div class="bulk-asc-list">
-        ${active.map(o=>`
+        ${groups[key].map(o=>`
           <label class="bulk-asc-item">
-            <input type="checkbox" class="bulkExcelCheck" data-id="${o.id}" checked>
+            <input type="checkbox" class="bulkExcelCheck" data-id="${o.id}" ${prevChecked[o.id]===false ? '' : 'checked'}>
             <span>#${o.id} · ${o.bayi_adi || o.cust_name || ''}${o.cust_address?' · 📍'+o.cust_address:''} · ${orderPieceCount(o)} parça</span>
           </label>`).join('')}
       </div>
-    </div>`;
+    </div>`).join('') + `
+    <div class="form-actions" style="margin-top:10px;">
+      <span class="hint" id="bulkExcelCount"></span>
+      <button class="btn btn-ghost btn-sm" id="bulkExcelToggleAll">Tümünü seç/kaldır</button>
+      <button class="btn btn-primary btn-sm" id="bulkExcelDownload">Excel olarak indir</button>
+    </div>
+  `;
   const countEl = el.querySelector('#bulkExcelCount');
   const updateCount = ()=>{
     const n = el.querySelectorAll('.bulkExcelCheck:checked').length;
     countEl.textContent = `${n} sipariş seçili`;
   };
   el.querySelectorAll('.bulkExcelCheck').forEach(chk=> chk.onchange = updateCount);
+  updateCount();
   el.querySelector('#bulkExcelToggleAll').onclick = ()=>{
     const checks = el.querySelectorAll('.bulkExcelCheck');
     const allChecked = Array.from(checks).every(c=>c.checked);
@@ -4245,23 +4260,36 @@ function renderBulkEtiket(){
   const el = document.getElementById('bulkEtiketSection');
   if(!el) return;
   const active = orders.filter(o=>o.status < DELIVERED_INDEX && (o.lines||[]).length);
+  // Mevcut işaretleme durumunu koru — arama/filtre değişince kullanıcının elle
+  // kaldırdığı tikler geri gelmesin.
+  const prevChecked = {};
+  el.querySelectorAll('.bulkEtkCheck').forEach(c=>{ prevChecked[c.dataset.id] = c.checked; });
   if(active.length===0){
     el.innerHTML = `<div class="pane empty-state"><div style="font-size:13px;">Etiket basılacak bekleyen sipariş yok.</div></div>`;
     return;
   }
-  el.innerHTML = `
-    <div class="pane form-card bulk-asc-group">
+  // ASC bölümündeki gibi, siparişler cam kalınlığına göre (8mm/6mm/5mm vb.) gruplanıp
+  // ayrı kutular hâlinde gösteriliyor — hızlıca tek kalınlığı seçip diğerlerini bırakabilmek için.
+  const groups = {};
+  active.forEach(o=>{
+    const key = parseKalinlik(o.product_label) || 'BELİRSİZ KALINLIK';
+    (groups[key] = groups[key] || []).push(o);
+  });
+  const keys = Object.keys(groups).sort();
+  el.innerHTML = keys.map(key=>`
+    <div class="pane form-card bulk-asc-group" style="margin-bottom:14px;">
+      <div class="bulk-asc-head"><b>${key}</b><span class="hint">${groups[key].length} sipariş</span></div>
       <div class="bulk-asc-list">
-        ${active.map(o=>`
+        ${groups[key].map(o=>`
           <label class="bulk-asc-item">
-            <input type="checkbox" class="bulkEtkCheck" data-id="${o.id}" checked>
+            <input type="checkbox" class="bulkEtkCheck" data-id="${o.id}" ${prevChecked[o.id]===false ? '' : 'checked'}>
             <span>#${o.id} · ${o.bayi_adi || o.cust_name || ''}${o.cust_address?' · 📍'+o.cust_address:''} · ${orderPieceCount(o)} etiket</span>
           </label>`).join('')}
       </div>
-      <div class="form-actions" style="margin-top:10px;">
-        <button class="btn btn-primary btn-sm" id="bulkEtkPrint">🏷️ Seçilenleri birlikte yazdır</button>
-        <span class="hint" id="bulkEtkHint"></span>
-      </div>
+    </div>`).join('') + `
+    <div class="form-actions" style="margin-top:10px;">
+      <button class="btn btn-primary btn-sm" id="bulkEtkPrint">🏷️ Seçilenleri birlikte yazdır</button>
+      <span class="hint" id="bulkEtkHint"></span>
     </div>
   `;
   const selectedOrders = ()=>{
@@ -4304,6 +4332,10 @@ function renderBulkAsc(){
   const el = document.getElementById('bulkAscSection');
   if(!el) return;
   const active = orders.filter(o=>o.status < DELIVERED_INDEX);
+  // Mevcut işaretleme durumunu koru — arama/filtre değişince kullanıcının elle
+  // kaldırdığı tikler geri gelmesin.
+  const prevChecked = {};
+  el.querySelectorAll('.bulkAscCheck').forEach(c=>{ prevChecked[c.dataset.id] = c.checked; });
   const groups = {};
   active.forEach(o=>{
     const key = ascGroupKeyForOrder(o);
@@ -4327,7 +4359,7 @@ function renderBulkAsc(){
       <div class="bulk-asc-list">
         ${grp.map(o=>`
           <label class="bulk-asc-item">
-            <input type="checkbox" class="bulkAscCheck" data-key="${encodeURIComponent(key)}" data-id="${o.id}" checked>
+            <input type="checkbox" class="bulkAscCheck" data-key="${encodeURIComponent(key)}" data-id="${o.id}" ${prevChecked[o.id]===false ? '' : 'checked'}>
             <span>#${o.id} · ${o.bayi_adi || o.cust_name || ''}${o.cust_address?' · 📍'+o.cust_address:''} · ${orderPieceCount(o)} parça</span>
           </label>`).join('')}
       </div>
