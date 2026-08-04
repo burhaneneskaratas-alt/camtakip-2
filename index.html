@@ -304,6 +304,7 @@ let profile = null;   // {id, full_name, role, workshop_name}
 let orders = [];
 let sellers = [];      // müşteri görünümünde seçilecek satıcı/atölye listesi
 let activeFilter = 'all';
+let searchQuery = '';
 let lineState = [];
 let isicamState = {dis: 4, bosluk: 12, ic: 4, renk: 'Şeffaf+Şeffaf'}; // seçili Isıcam
 let editingOrderId = null; // düzenleme modundaysak sipariş id'si, değilse null
@@ -646,8 +647,14 @@ async function bootWorkshop(){
 }
 
 async function loadOrdersForSeller(){
-  const {data, error} = await sb.from('orders').select('*').eq('seller_id', profile.id).order('created_at', {ascending:false});
+  const {data, error} = await sb.from('orders').select('*').eq('seller_id', profile.id).is('deleted_at', null).order('created_at', {ascending:false});
   orders = error ? [] : data;
+}
+
+let deletedOrders = [];
+async function loadDeletedOrdersForSeller(){
+  const {data, error} = await sb.from('orders').select('*').eq('seller_id', profile.id).not('deleted_at', 'is', null).order('deleted_at', {ascending:false});
+  deletedOrders = error ? [] : data;
 }
 
 /* =========================================================
@@ -1057,7 +1064,14 @@ function renderWorkshop(){
       <div class="section-eyebrow" style="margin-bottom:0;">Sipariş listesi</div>
       <div class="filter-row" id="filterRow"></div>
     </div>
+    <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
+      <input type="text" id="orderSearch" placeholder="🔍 Bayi/müşteri adına göre ara…" style="flex:1; min-width:200px; padding:9px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text); font-size:13px; outline:none;">
+      <button class="btn btn-ghost btn-sm" id="reportBtn">📊 Rapor</button>
+      <button class="btn btn-ghost btn-sm" id="trashBtn">🗑️ Silinenler</button>
+    </div>
     <div id="orderList"></div>
+    <div id="trashSection" style="display:none;"></div>
+    <div id="reportSection" style="display:none;"></div>
     <div id="deliveredSection"></div>
     <div class="section-eyebrow" style="margin-top:26px;">Toplu Etiket Yazdır — birden fazla siparişin etiketlerini tek sayfa dizisinde bas (fire azalt)</div>
     <div id="bulkEtiketSection"></div>
@@ -1067,6 +1081,12 @@ function renderWorkshop(){
     <div id="bulkAscSection"></div>
   `;
   document.getElementById('logoutBtn').onclick = handleLogout;
+  document.getElementById('orderSearch').oninput = (e)=>{
+    searchQuery = e.target.value;
+    renderList(true);
+  };
+  document.getElementById('trashBtn').onclick = toggleTrashSection;
+  document.getElementById('reportBtn').onclick = toggleReportSection;
   renderCatalogSection();
   document.getElementById('s_save').onclick = saveCompanyInfo;
   initSeg('w_temper');
@@ -1150,7 +1170,7 @@ async function submitWorkshopOrder(){
     renk: document.getElementById('w_isicam').checked
       ? buildIsicamText('w')
       : segVal('w_renk'),
-    lines: linesClean.map(l=>({w:parseFloat(l.w), h:parseFloat(l.h), qty:parseInt(l.qty), note:l.note||'', dm:l.dm||[], sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:l.isicam||{}})),
+    lines: linesClean.map(l=>({w:parseFloat(l.w), h:parseFloat(l.h), qty:parseInt(l.qty), note:l.note||'', dm:l.dm||[], sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:l.isicam||{}, fiyat:l.fiyat||''})),
     note: document.getElementById('w_note').value,
     asc_customer_code: document.getElementById('w_asc_code').value.trim() || null,
     due: document.getElementById('w_due').value || null,
@@ -1187,7 +1207,7 @@ async function bootCustomer(){
 }
 
 async function loadOrdersForCustomer(){
-  const {data, error} = await sb.from('orders').select('*').eq('customer_id', profile.id).order('created_at', {ascending:false});
+  const {data, error} = await sb.from('orders').select('*').eq('customer_id', profile.id).is('deleted_at', null).order('created_at', {ascending:false});
   orders = error ? [] : data;
 }
 
@@ -2161,7 +2181,7 @@ async function submitCustomerOrder(){
     renk: document.getElementById('c_isicam').checked
       ? buildIsicamText('c')
       : segVal('c_renk'),
-    lines: linesClean.map(l=>({w:parseFloat(l.w), h:parseFloat(l.h), qty:parseInt(l.qty), note:l.note||'', dm:l.dm||[], sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:l.isicam||{}})),
+    lines: linesClean.map(l=>({w:parseFloat(l.w), h:parseFloat(l.h), qty:parseInt(l.qty), note:l.note||'', dm:l.dm||[], sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:l.isicam||{}, fiyat:l.fiyat||''})),
     note: noteVal, due: existing ? existing.due : null, status:0
   };
   const wasEditing = editingOrderId;
@@ -2266,8 +2286,8 @@ function openEditOrder(o, isSellerView){
     setSegVal(prefix+'_renk', o.renk || 'Füme');
   }
 
-  lineState = (o.lines||[]).map(l=>({w:l.w, h:l.h, qty:l.qty, note:l.note||'', dm:(l.dm||[]).map(d=>({...d})), sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:(l.isicam && l.isicam.renk) ? {...l.isicam} : {...isicamState}}));
-  if(lineState.length===0) lineState.push({w:'',h:'',qty:1,note:'',sekilli:false, isicam: {...isicamState}});
+  lineState = (o.lines||[]).map(l=>({w:l.w, h:l.h, qty:l.qty, note:l.note||'', dm:(l.dm||[]).map(d=>({...d})), sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:(l.isicam && l.isicam.renk) ? {...l.isicam} : {...isicamState}, fiyat:l.fiyat||''}));
+  if(lineState.length===0) lineState.push({w:'',h:'',qty:1,note:'',sekilli:false, fiyat:'', isicam: {...isicamState}});
   renderLines();
 
   const submitBtn = document.getElementById(prefix+'_submit');
@@ -2293,12 +2313,12 @@ function cancelEdit(prefix){
 }
 
 function addLine(){
-  lineState.push({w:'',h:'',qty:1,note:'',sekilli:false, isicam: {...isicamState}});
+  lineState.push({w:'',h:'',qty:1,note:'',sekilli:false, fiyat:'', isicam: {...isicamState}});
   renderLines();
 }
 function removeLine(idx){
   lineState.splice(idx,1);
-  if(lineState.length===0) lineState.push({w:'',h:'',qty:1,note:'',sekilli:false, isicam: {...isicamState}});
+  if(lineState.length===0) lineState.push({w:'',h:'',qty:1,note:'',sekilli:false, fiyat:'', isicam: {...isicamState}});
   renderLines();
 }
 function renderLines(){
@@ -2328,6 +2348,11 @@ function renderLines(){
         : `<button class="btn btn-ghost btn-sm sekil-foto-btn" data-idx="${i}">📷 Şekil fotoğrafı/krokisi ekle</button>
            <span class="hint sekil-foto-status" data-idx="${i}"></span>`}
       <input type="file" accept="image/*" capture="environment" class="sekil-foto-input" data-idx="${i}" style="display:none;">
+    </div>` : ''}
+    ${prefix==='w' ? `
+    <div class="line-fiyat" style="display:flex; align-items:center; gap:6px; margin:-4px 0 10px 0; padding-left:4px;">
+      <label style="font-size:11px; color:var(--text-mut);">Birim Fiyat (TL/m², opsiyonel — sadece Excel'e yazılır):</label>
+      <input type="number" step="0.01" placeholder="0" value="${l.fiyat||''}" data-field="fiyat" data-idx="${i}" style="width:100px; padding:4px 8px; font-size:12px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text);">
     </div>` : ''}
   `).join('');
   el.querySelectorAll('.sekil-foto-btn').forEach(btn=>{
@@ -2374,7 +2399,7 @@ function renderLines(){
       const idx = parseInt(inp.dataset.idx), field = inp.dataset.field;
       lineState[idx][field] = inp.value;
       document.getElementById(prefix+'_totalM2').textContent = fmtM2(linesTotalM2(lineState));
-      inp.closest('.line-row').querySelector('.line-m2').textContent = fmtM2(lineM2(lineState[idx]));
+      inp.closest('.line-row')?.querySelector('.line-m2') && (inp.closest('.line-row').querySelector('.line-m2').textContent = fmtM2(lineM2(lineState[idx])));
     };
     inp.onkeydown = (e)=>{
       const idx = parseInt(inp.dataset.idx);
@@ -3238,6 +3263,10 @@ function renderList(isSellerView){
   const deliveredOrders = orders.filter(o=>o.status === DELIVERED_INDEX);
   let list = activeOrders.slice();
   if(isSellerView && activeFilter !== 'all') list = list.filter(o=>String(o.status)===activeFilter);
+  if(isSellerView && searchQuery.trim()){
+    const q = searchQuery.trim().toLocaleLowerCase('tr');
+    list = list.filter(o=> `${o.bayi_adi||''} ${o.cust_name||''}`.toLocaleLowerCase('tr').includes(q));
+  }
 
   el.innerHTML = list.length===0
     ? `<div class="pane empty-state"><div class="section-eyebrow">Kayıt yok</div><div style="font-size:13px;">Henüz aktif sipariş bulunmuyor.</div></div>`
@@ -3253,8 +3282,8 @@ function renderList(isSellerView){
     b.onclick = async ()=>{
       const o = orders.find(x=>String(x.id)===b.dataset.id);
       if(!o) return;
-      if(!confirm(`#${o.id} numaralı siparişi kalıcı olarak silmek istediğine emin misin? Bu işlem geri alınamaz.`)) return;
-      const {data, error} = await sb.from('orders').delete().eq('id', o.id).select();
+      if(!confirm(`#${o.id} numaralı siparişi silmek istediğine emin misin? Silinenler'den geri alabilirsin.`)) return;
+      const {data, error} = await sb.from('orders').update({deleted_at: new Date().toISOString()}).eq('id', o.id).select();
       if(sbCheckRow(data, error, 'Sipariş silinemedi.')) return;
       if(isSellerView){ await loadOrdersForSeller(); } else { await loadOrdersForCustomer(); }
       renderStats(); renderFilters(); renderList(isSellerView);
@@ -3350,6 +3379,106 @@ function renderList(isSellerView){
     }
   }
   if(isSellerView){ renderBulkEtiket(); renderBulkAsc(); renderBulkExcel(); }
+}
+
+/* =========================================================
+   SİLİNENLER (soft-delete arşivi)
+   ========================================================= */
+let trashVisible = false;
+async function toggleTrashSection(){
+  trashVisible = !trashVisible;
+  const el = document.getElementById('trashSection');
+  if(!el) return;
+  el.style.display = trashVisible ? 'block' : 'none';
+  if(trashVisible){ await loadDeletedOrdersForSeller(); renderTrashSection(); }
+}
+function renderTrashSection(){
+  const el = document.getElementById('trashSection');
+  if(!el) return;
+  el.innerHTML = `
+    <div class="list-head" style="margin-top:26px;">
+      <div class="section-eyebrow" style="margin-bottom:0;">Silinenler <span class="hint">(${deletedOrders.length})</span></div>
+    </div>
+    ${deletedOrders.length===0
+      ? `<div class="pane empty-state"><div style="font-size:13px;">Silinmiş sipariş yok.</div></div>`
+      : deletedOrders.map(o=>`
+        <div class="pane order-card" data-id="${o.id}">
+          <div class="order-body">
+            <div class="order-top"><span class="order-id">#${o.id}</span><span class="order-cust">${o.bayi_adi || o.cust_name || ''}</span></div>
+            <div class="order-props" style="color:var(--text-dim);">Silinme: ${fmtDate(o.deleted_at)}</div>
+          </div>
+          <div class="order-actions">
+            <button class="btn btn-ghost btn-sm restoreBtn" data-id="${o.id}">↩️ Geri al</button>
+            <button class="btn btn-ghost btn-sm permDeleteBtn" data-id="${o.id}" style="color:var(--danger);">Kalıcı sil</button>
+          </div>
+        </div>
+      `).join('')}
+  `;
+  el.querySelectorAll('.restoreBtn').forEach(b=>{
+    b.onclick = async ()=>{
+      const {data, error} = await sb.from('orders').update({deleted_at:null}).eq('id', b.dataset.id).select();
+      if(sbCheckRow(data, error, 'Geri alınamadı.')) return;
+      await loadOrdersForSeller(); await loadDeletedOrdersForSeller();
+      renderStats(); renderFilters(); renderList(true); renderTrashSection();
+    };
+  });
+  el.querySelectorAll('.permDeleteBtn').forEach(b=>{
+    b.onclick = async ()=>{
+      if(!confirm('Bu siparişi KALICI olarak silmek istediğine emin misin? Bu işlem geri alınamaz.')) return;
+      const {data, error} = await sb.from('orders').delete().eq('id', b.dataset.id).select();
+      if(sbCheckRow(data, error, 'Kalıcı silme başarısız.')) return;
+      await loadDeletedOrdersForSeller();
+      renderTrashSection();
+    };
+  });
+}
+
+/* =========================================================
+   RAPOR — satıcı için basit özet istatistikler
+   ========================================================= */
+let reportVisible = false;
+function toggleReportSection(){
+  reportVisible = !reportVisible;
+  const el = document.getElementById('reportSection');
+  if(!el) return;
+  el.style.display = reportVisible ? 'block' : 'none';
+  if(reportVisible) renderReportSection();
+}
+function renderReportSection(){
+  const el = document.getElementById('reportSection');
+  if(!el) return;
+  const now = new Date();
+  const thisMonth = orders.filter(o=>{
+    const d = new Date(o.created_at);
+    return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth();
+  });
+  const totalM2All = linesTotalM2(orders.flatMap(o=>o.lines||[]));
+  const totalM2Month = linesTotalM2(thisMonth.flatMap(o=>o.lines||[]));
+  const bayiCounts = {};
+  orders.forEach(o=>{
+    const key = o.bayi_adi || o.cust_name || '—';
+    bayiCounts[key] = (bayiCounts[key]||0) + 1;
+  });
+  const topBayi = Object.entries(bayiCounts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  el.innerHTML = `
+    <div class="list-head" style="margin-top:26px;">
+      <div class="section-eyebrow" style="margin-bottom:0;">Rapor</div>
+    </div>
+    <div class="pane form-card">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:14px; margin-bottom:16px;">
+        <div><div class="hint">Toplam sipariş</div><div style="font-size:22px; font-weight:800;">${orders.length}</div></div>
+        <div><div class="hint">Toplam m²</div><div style="font-size:22px; font-weight:800;">${fmtM2(totalM2All)}</div></div>
+        <div><div class="hint">Bu ay sipariş</div><div style="font-size:22px; font-weight:800;">${thisMonth.length}</div></div>
+        <div><div class="hint">Bu ay m²</div><div style="font-size:22px; font-weight:800;">${fmtM2(totalM2Month)}</div></div>
+      </div>
+      <div class="section-eyebrow">En çok sipariş veren bayiler</div>
+      ${topBayi.length===0 ? `<div class="hint">Henüz veri yok.</div>` : topBayi.map(([name,count],i)=>`
+        <div style="display:flex; justify-content:space-between; padding:8px 0; border-bottom:1px solid var(--border); font-size:13.5px;">
+          <span>${i+1}. ${name}</span><span style="font-weight:700;">${count} sipariş</span>
+        </div>
+      `).join('')}
+    </div>
+  `;
 }
 
 /* =========================================================
@@ -3538,6 +3667,46 @@ function drawOrderExcelBlock(wb, ws, o, base){
       r += 12;
     });
     lastUsedRow = r - 1;
+  }
+
+  // Fiyat Bölümü — sadece en az bir satıra birim fiyat girilmişse eklenir.
+  // Bilerek sadece Excel çıktısında: uygulama ekranlarının hiçbirinde (müşteri veya
+  // satıcı listesinde) fiyat gösterilmiyor, bu satıcı-only bilgi sadece bu dosyada yer alır.
+  const fiyatLines = lines.filter(l=>l.fiyat && parseFloat(l.fiyat)>0);
+  if(fiyatLines.length){
+    let r = lastUsedRow + 2;
+    ws.mergeCells(`A${r}:I${r}`);
+    styleCell(ws.getCell(`A${r}`), {font:FONT_HDR, fill:GRAY_FILL, align:{h:'center'}});
+    ws.getCell(`A${r}`).value = 'Fiyat';
+    r += 1;
+    ['No','Genişlik','Yükseklik','Adet','m2','Birim Fiyat (TL/m²)','Tutar (TL)'].forEach((val,i)=>{
+      const cell = ws.getCell(r, i+1);
+      styleCell(cell, {font:FONT_TBL, align:{h:'center'}});
+      cell.value = val;
+    });
+    r += 1;
+    let genelTutar = 0;
+    lines.forEach((l,i)=>{
+      const qty = parseInt(l.qty)||0, w = parseFloat(l.w)||0, h = parseFloat(l.h)||0;
+      const m2 = (w*h*qty)/1000000;
+      const fiyat = parseFloat(l.fiyat)||0;
+      const tutar = m2*fiyat;
+      genelTutar += tutar;
+      const vals = { A: i+1, B: w, C: h, D: qty, E: Number(m2.toFixed(4)), F: fiyat, G: Number(tutar.toFixed(2)) };
+      Object.entries(vals).forEach(([col,val])=>{
+        const cell = ws.getCell(`${col}${r}`);
+        styleCell(cell, {font:FONT_TBL_N, align:{h:'center'}, numFmt: (col==='F'||col==='G') ? '#,##0.00' : (col==='E' ? '0.00' : undefined)});
+        cell.value = val;
+      });
+      r += 1;
+    });
+    ws.mergeCells(`A${r}:E${r}`);
+    styleCell(ws.getCell(`A${r}`), {font:FONT_TBL, fill:GRAY_FILL, align:{h:'right'}});
+    ws.getCell(`A${r}`).value = 'GENEL TOPLAM';
+    styleCell(ws.getCell(`F${r}`), {font:FONT_TBL, fill:GRAY_FILL});
+    styleCell(ws.getCell(`G${r}`), {font:FONT_TBL, fill:GRAY_FILL, numFmt:'#,##0.00 "TL"'});
+    ws.getCell(`G${r}`).value = Number(genelTutar.toFixed(2));
+    lastUsedRow = r;
   }
   return lastUsedRow;
 }
