@@ -3939,6 +3939,24 @@ function renderBulkExcel(){
 async function downloadWorkbook(wb, filename){
   const buf = await wb.xlsx.writeBuffer();
   const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  // Destekleyen tarayıcılarda (Chrome/Edge) "Farklı Kaydet" penceresi açılıp
+  // kullanıcı istediği klasörü seçebiliyor; desteklemeyen tarayıcılarda (Firefox/Safari)
+  // eski usul otomatik indirmeye düşülüyor.
+  if(window.showSaveFilePicker){
+    try{
+      const handle = await window.showSaveFilePicker({
+        suggestedName: filename,
+        types: [{description:'Excel Dosyası', accept:{'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet':['.xlsx']}}]
+      });
+      const writable = await handle.createWritable();
+      await writable.write(blob);
+      await writable.close();
+      return;
+    }catch(err){
+      if(err.name === 'AbortError') return; // kullanıcı "Farklı Kaydet" penceresini iptal etti
+      // desteklenmiyor/başka bir hata olursa eski yönteme düş
+    }
+  }
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url; a.download = filename;
