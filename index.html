@@ -2767,7 +2767,7 @@ const DELIK_SABLON_TANIMLARI = {
       {id:'ok_1', type:'single', x1:150+120-21, y1:70+57,  x2:150+120+25, y2:70+57,  labelX:150+120+30, labelY:70+57},
       {id:'ok_2', type:'single', x1:150+120-21, y1:70+117, x2:150+120+25, y2:70+117, labelX:150+120+30, labelY:70+117},
       {id:'ok_3', type:'double', x:150+120+12, y1:70+64, y2:70+110, labelX:150+120+22, labelY:70+87},
-      {id:'ok_4', type:'single', x1:150+35, y1:70+220, x2:150+35, y2:70+220+40, labelX:150+35, labelY:70+220+45}
+      {id:'ok_4', type:'single', x1:150+35, y1:70+220, x2:150+35, y2:70+220+40, decorative:true}
     ],
     note: 'çift kol delikli camlar için\nkol delikleri boydan merkez delinecek',
     noteX: 150-20, noteY: 70+220+45
@@ -2796,7 +2796,7 @@ const DELIK_SABLON_TANIMLARI = {
       {id:'ok_9', type:'single', x1:150+22, y1:80+260-15, x2:150+22, y2:80+260+20},
       {id:'ok_10', type:'single', x1:150+140-15, y1:80+260-22, x2:150+140+20, y2:80+260-22},
       {id:'ok_11', type:'single', x1:150+140-22, y1:80+260-15, x2:150+140-22, y2:80+260+20},
-      {id:'ok_12', type:'single', x1:150+70, y1:80+260, x2:150+70, y2:80+260+40}
+      {id:'ok_12', type:'single', x1:150+70, y1:80+260, x2:150+70, y2:80+260+40, decorative:true}
     ],
     note: 'askı ve çift kol delikli camlar için\nkol delikleri boydan merkez delinecek',
     noteX: 150-30, noteY: 80+260+45
@@ -2825,7 +2825,7 @@ const DELIK_SABLON_TANIMLARI = {
       {id:'ok_9', type:'single', x1:160+110-11, y1:70+77, x2:160+110+50, y2:70+77},
       {id:'ok_10', type:'single', x1:160+110-11, y1:70+177, x2:160+110+50, y2:70+177},
       {id:'ok_11', type:'double', x:160+110+15, y1:70+84, y2:70+170},
-      {id:'ok_12', type:'single', x1:160+55, y1:70+280, x2:160+55, y2:70+280+35}
+      {id:'ok_12', type:'single', x1:160+55, y1:70+280, x2:160+55, y2:70+280+35, decorative:true}
     ],
     note: 'menteşe ve çift kol delikli camlar\nkol delikleri boydan merkez delinecek',
     noteX: 160-30, noteY: 70+280+40
@@ -2930,7 +2930,7 @@ const DELIK_SABLON_TANIMLARI = {
           {id:'ok_9', type:'single', x1:260+110-6, y1:70+87, x2:260+110+25, y2:70+87},
           {id:'ok_10', type:'single', x1:260+110-6, y1:70+137, x2:260+110+25, y2:70+137},
           {id:'ok_11', type:'double', x:260+110+15, y1:70+94, y2:70+130},
-          {id:'ok_12', type:'single', x1:260+55, y1:70+230, x2:260+55, y2:70+230+35}
+          {id:'ok_12', type:'single', x1:260+55, y1:70+230, x2:260+55, y2:70+230+35, decorative:true}
         ],
         camOlcuArrow: null,
         note: 'MENTEŞE DELİKLİ CAMLAR İÇİN\nÇİFT kol delikleri boydan merkez delinecek',
@@ -3026,6 +3026,7 @@ function openDsDetail(key){
       ? ((mevcutSablon && mevcutSablon.paneller && mevcutSablon.paneller[p.key]) ? mevcutSablon.paneller[p.key].olculer : {})
       : (mevcutSablon ? mevcutSablon.olculer : {});
     p.arrows.forEach(a=>{
+      if(a.decorative) return; // sadece nota işaret eden ok — ölçü girişi yok
       const lbl = dsAutoLabel(a);
       const inp = document.createElement('input');
       inp.type = 'number'; inp.step = '0.1'; inp.placeholder = 'cm';
@@ -3060,6 +3061,7 @@ document.getElementById('ds_save').onclick = ()=>{
   const readPanelOlculer = (p, prefix)=>{
     const olculer = {};
     p.arrows.forEach(a=>{
+      if(a.decorative) return;
       const v = document.getElementById('ds_inp_'+prefix+a.id).value;
       olculer[a.id] = (v!=='' && v!=null) ? parseFloat(v) : null;
     });
@@ -3133,6 +3135,8 @@ function dsBuildAnchorXML(tpl, delikSablonData, row, idStart, lineH){
     out += dsOoxmlShape(id++, 'Cam', X(p.glass.x), Y(p.glass.y), dsEmu(p.glass.w), dsEmu(p.glass.h), 'rect', 'F5F7FA', '000000', 19050);
     p.holes.forEach((h,i)=>{ out += dsOoxmlShape(id++, 'Delik '+(i+1), X(h.x), Y(h.y), dsEmu(h.w), dsEmu(h.h), 'ellipse', 'FFFFFF', '000000', 12700); });
     p.arrows.forEach(a=>{
+      // decorative=true ok her zaman çizilir (VBA'daki gibi geometri sabit), ama
+      // ölçü girişi olmadığı için olculer[a.id] hiç set edilmez → etiket kutusu eklenmez.
       if(a.type==='single'){
         out += dsOoxmlConnector(id++, 'Ok', X(a.x1), Y(a.y1), X(a.x2), Y(a.y2), false);
       } else {
