@@ -2909,108 +2909,92 @@ document.getElementById('dm_addDelik').onclick = function(){
 };
 
 // ====================================================================
-// ŞABLONLAR — atölyeden doğrulanmış sabit ölçüler (mm). Kol delikleri
-// her zaman camın boyuna göre ortalanır ("boydan merkez delinecek").
+// ŞABLONLAR — Burhan'ın verdiği VBA kodlarının (Ciz_Aski_Ve_Cift_Kol_Delikli,
+// Ciz_2_Menteseli_Cam, Ciz_3_Menteseli_Cam, Ciz_Cift_Menteseli_Camlar,
+// Ciz_Isi_Cam_Ve_Delik, Ciz_Cift_Kol_Delikli_Cam) BİREBİR aynısı — hiçbir
+// ölçü burada yorumlanmadı/değiştirilmedi, sadece VBA'daki "sol üst köşe +
+// boyut" ovalleri buradaki "merkez noktası" (ust/yatay) formuna çevrildi.
+// Kaynak: Kuante_Cam_Sablon_Modulu.txt. w/h = kullanıcının girdiği En/Boy.
 // ====================================================================
-const SB = {
-  MENTESE_KENAR:24, MENTESE_ARA:45, MENTESE_UST_ALT:300, ORTA_MENTESE_UST:700,
-  MENTESE_KENAR_CC:20, MENTESE_ARA_CC:30,          // "Çift Menteşeli Camlar" panelinde farklı donanım
-  KOL_KENAR_MENTESELI:100, KOL_KENAR_TEK:50, KOL_ARALIK:160,
-  ASKI_KENAR:17, ASKI_UST_ALT:80,
-  BACA_CAP:100, BACA_UST:250   // ⚠️ gerçek bir kaynaktan doğrulanmadı, teyit gerekiyor
-};
-
-function sbMentesePair(u, kenar, ara, side){ return [{ust:u,yatay:kenar,side}, {ust:u+ara,yatay:kenar,side}]; }
-function sbMenteseCiftleri(starts, kenar, ara, side){
-  side = side || 'sol';
-  return starts.flatMap(u => sbMentesePair(u, kenar, ara, side));
-}
-function sbIkiMenteseli(h, kenar, ara, side){
-  return sbMenteseCiftleri([SB.MENTESE_UST_ALT, h - SB.MENTESE_UST_ALT - ara], kenar, ara, side);
-}
-function sbUcMenteseli(h, kenar, ara, side){
-  return sbMenteseCiftleri([SB.MENTESE_UST_ALT, SB.ORTA_MENTESE_UST, h - SB.MENTESE_UST_ALT - ara], kenar, ara, side);
-}
-function sbKolHoles(h, kenar, side){
-  side = side || 'sag';
-  return [{ust:h/2-SB.KOL_ARALIK/2, yatay:kenar, side}, {ust:h/2+SB.KOL_ARALIK/2, yatay:kenar, side}];
-}
-function sbAskiHoles(h){
-  return [
-    {ust:SB.ASKI_UST_ALT, yatay:SB.ASKI_KENAR, side:'sol'}, {ust:SB.ASKI_UST_ALT, yatay:SB.ASKI_KENAR, side:'sag'},
-    {ust:h-SB.ASKI_UST_ALT, yatay:SB.ASKI_KENAR, side:'sol'}, {ust:h-SB.ASKI_UST_ALT, yatay:SB.ASKI_KENAR, side:'sag'}
-  ];
-}
-
 const SB_TEMPLATES = {
   askikol: {
-    ad:'Askı + Çift Kol', ornek:{w:400,h:900},
+    ad:'Askı + Çift Kol', ornek:{w:300,h:700},
     build:(w,h)=>({
-      holes: sbAskiHoles(h).concat(sbKolHoles(h, SB.KOL_KENAR_TEK)),
-      dims: [
-        {type:'v1', x:SB.ASKI_KENAR, y1:0, y2:SB.ASKI_UST_ALT, label:SB.ASKI_UST_ALT+'mm'},
-        {type:'h1', y:SB.ASKI_UST_ALT, x1:0, x2:SB.ASKI_KENAR, label:SB.ASKI_KENAR+'mm'},
-        {type:'v2', x:w-SB.KOL_KENAR_TEK, y1:h/2-SB.KOL_ARALIK/2, y2:h/2+SB.KOL_ARALIK/2, label:SB.KOL_ARALIK+'mm'}
+      holes: [
+        {ust:22, yatay:22, side:'sol'}, {ust:22, yatay:22, side:'sag'},
+        {ust:h-22, yatay:22, side:'sol'}, {ust:h-22, yatay:22, side:'sag'},
+        {ust:97, yatay:32, side:'sag'}, {ust:157, yatay:32, side:'sag'}
       ],
-      note:'askı ve çift kol delikli camlar\nkol delikleri boydan merkez delinecek'
+      dims: [
+        {type:'v1', x:22, y1:0, y2:22, label:''},
+        {type:'v2', x:w-32, y1:97, y2:157, label:''}
+      ],
+      note:'askı ve çift kol delikli camlar için\nkol delikleri boydan merkez delinecek'
     })
   },
   mentese2: {
-    ad:'2 Menteşeli', ornek:{w:400,h:900},
+    ad:'2 Menteşeli', ornek:{w:300,h:900},
     build:(w,h)=>({
-      holes: sbIkiMenteseli(h, SB.MENTESE_KENAR, SB.MENTESE_ARA).concat(sbKolHoles(h, SB.KOL_KENAR_MENTESELI)),
+      holes: [
+        {ust:22, yatay:17, side:'sol'}, {ust:97, yatay:17, side:'sol'},
+        {ust:167, yatay:17, side:'sol'}, {ust:h-18, yatay:17, side:'sol'},
+        {ust:77, yatay:18, side:'sag'}, {ust:177, yatay:18, side:'sag'}
+      ],
       dims: [
-        {type:'v1', x:SB.MENTESE_KENAR, y1:0, y2:SB.MENTESE_UST_ALT, label:SB.MENTESE_UST_ALT+'mm'},
-        {type:'v2', x:SB.MENTESE_KENAR-14, y1:SB.MENTESE_UST_ALT, y2:SB.MENTESE_UST_ALT+SB.MENTESE_ARA, label:SB.MENTESE_ARA+'mm'},
-        {type:'v2', x:w-SB.KOL_KENAR_MENTESELI, y1:h/2-SB.KOL_ARALIK/2, y2:h/2+SB.KOL_ARALIK/2, label:SB.KOL_ARALIK+'mm'}
+        {type:'v1', x:17, y1:0, y2:22, label:''},
+        {type:'v2', x:w-18, y1:77, y2:177, label:''}
       ],
       note:'menteşe ve çift kol delikli camlar\nkol delikleri boydan merkez delinecek'
     })
   },
   mentese3: {
-    ad:'3 Menteşeli', ornek:{w:400,h:1100},
+    ad:'3 Menteşeli', ornek:{w:300,h:1100},
     build:(w,h)=>({
-      holes: sbUcMenteseli(h, SB.MENTESE_KENAR, SB.MENTESE_ARA).concat(sbKolHoles(h, SB.KOL_KENAR_MENTESELI)),
+      holes: [
+        {ust:22, yatay:17, side:'sol'}, {ust:72, yatay:17, side:'sol'},
+        {ust:127, yatay:17, side:'sol'}, {ust:182, yatay:17, side:'sol'},
+        {ust:242, yatay:17, side:'sol'}, {ust:297, yatay:17, side:'sol'},
+        {ust:127, yatay:18, side:'sag'}, {ust:202, yatay:18, side:'sag'}
+      ],
       dims: [
-        {type:'v1', x:SB.MENTESE_KENAR, y1:0, y2:SB.MENTESE_UST_ALT, label:SB.MENTESE_UST_ALT+'mm'},
-        {type:'v1', x:SB.MENTESE_KENAR-14, y1:0, y2:SB.ORTA_MENTESE_UST, label:SB.ORTA_MENTESE_UST+'mm'},
-        {type:'v2', x:w-SB.KOL_KENAR_MENTESELI, y1:h/2-SB.KOL_ARALIK/2, y2:h/2+SB.KOL_ARALIK/2, label:SB.KOL_ARALIK+'mm'}
+        {type:'v1', x:17, y1:0, y2:22, label:''},
+        {type:'v2', x:w-18, y1:127, y2:202, label:''}
       ],
       note:'3 menteşe + çift kol delikli camlar\nkol delikleri boydan merkez delinecek'
     })
   },
   ciftmentese: {
-    ad:'Çift Menteşeli Camlar', ornek:{w:400,h:900},
+    ad:'Çift Menteşeli Camlar', ornek:{w:300,h:700},
     build:(w,h)=>({
-      // Bu şablon eşleşen 2 cam için: burada "kollu" (dış) taraf üretiliyor —
-      // eşi olan sade cam, aynı menteşe zincirinin ayna-simetriği (kenar 20mm/ara 30mm).
-      holes: sbIkiMenteseli(h, SB.MENTESE_KENAR_CC, SB.MENTESE_ARA_CC).concat(sbKolHoles(h, SB.KOL_KENAR_MENTESELI)),
-      dims: [
-        {type:'v1', x:SB.MENTESE_KENAR_CC, y1:0, y2:SB.MENTESE_UST_ALT, label:SB.MENTESE_UST_ALT+'mm'},
-        {type:'v2', x:SB.MENTESE_KENAR_CC-14, y1:SB.MENTESE_UST_ALT, y2:SB.MENTESE_UST_ALT+SB.MENTESE_ARA_CC, label:SB.MENTESE_ARA_CC+'mm'},
-        {type:'v2', x:w-SB.KOL_KENAR_MENTESELI, y1:h/2-SB.KOL_ARALIK/2, y2:h/2+SB.KOL_ARALIK/2, label:SB.KOL_ARALIK+'mm'}
+      // VBA'da 2 ayrı cam (yan yana) çiziliyordu; buradaki tek dm_ editörü tek
+      // cam işlediği için "kollu" (2. cam) tarafı üretiliyor — eşi olan sade
+      // cam, aynı menteşe deliklerinin ayna-simetriği (kol'suz).
+      holes: [
+        {ust:22, yatay:17, side:'sol'}, {ust:82, yatay:17, side:'sol'},
+        {ust:132, yatay:17, side:'sol'}, {ust:h-18, yatay:17, side:'sol'},
+        {ust:87, yatay:13, side:'sag'}, {ust:137, yatay:13, side:'sag'}
       ],
-      note:'MENTEŞE DELİKLİ CAMLAR İÇİN\nÇİFT kol delikleri boydan merkez delinecek\n(eşi: sade menteşeli, ayna simetrik)'
+      dims: [
+        {type:'v1', x:17, y1:0, y2:22, label:''},
+        {type:'v2', x:w-13, y1:87, y2:137, label:''}
+      ],
+      note:'MENTEŞE DELİKLİ CAMLAR İÇİN\nÇİFT kol delikleri boydan merkez delinecek\n(eşi: sade menteşeli panel, ayna simetrik)'
     })
   },
   isicam: {
-    ad:'Isı Cam + Baca Deliği', ornek:{w:400,h:600},
+    ad:'Isı Cam + Baca Deliği', ornek:{w:300,h:600},
     build:(w,h)=>({
-      holes: [{ust:SB.BACA_UST, yatay:w/2, side:'sol'}],
-      dims: [
-        {type:'v1', x:w/2, y1:0, y2:SB.BACA_UST, label:SB.BACA_UST+'mm ⚠️'}
-      ],
-      note:'ısı cam + baca/menfez deliği\n⚠️ çap ve konum örnek — teyit gerekli',
-      holeRadius: SB.BACA_CAP/2
+      holes: [{ust:60, yatay:w/2, side:'sol'}],
+      dims: [],
+      note:'ısı cam + baca/menfez deliği',
+      holeRadius: 25
     })
   },
   ciftkol: {
-    ad:'Çift Kol Delikli (sade)', ornek:{w:400,h:700},
+    ad:'Çift Kol Delikli (sade)', ornek:{w:300,h:500},
     build:(w,h)=>({
-      holes: sbKolHoles(h, SB.KOL_KENAR_TEK),
-      dims: [
-        {type:'v2', x:w-SB.KOL_KENAR_TEK, y1:h/2-SB.KOL_ARALIK/2, y2:h/2+SB.KOL_ARALIK/2, label:SB.KOL_ARALIK+'mm'}
-      ],
+      holes: [{ust:57, yatay:33, side:'sag'}, {ust:117, yatay:33, side:'sag'}],
+      dims: [{type:'v2', x:w-33, y1:57, y2:117, label:''}],
       note:'çift kol delikli camlar için\nkol delikleri boydan merkez delinecek'
     })
   }
@@ -3032,15 +3016,15 @@ function sbSvg(w, h, tpl){
     if(d.type==='v1'){
       const x=X(d.x);
       out += `<line x1="${x}" y1="${Y(d.y1)}" x2="${x}" y2="${Y(d.y2)}" stroke="#333" stroke-width="1" marker-end="url(#sbArr)"/>`;
-      out += `<text x="${x-6}" y="${Y((d.y1+d.y2)/2)}" font-size="10" text-anchor="end" fill="#333">${d.label}</text>`;
+      if(d.label) out += `<text x="${x-6}" y="${Y((d.y1+d.y2)/2)}" font-size="10" text-anchor="end" fill="#333">${d.label}</text>`;
     } else if(d.type==='v2'){
       const x=X(d.x);
       out += `<line x1="${x}" y1="${Y(d.y1)}" x2="${x}" y2="${Y(d.y2)}" stroke="#333" stroke-width="1" marker-end="url(#sbArr)" marker-start="url(#sbArr)"/>`;
-      out += `<text x="${x+6}" y="${Y((d.y1+d.y2)/2)}" font-size="10" text-anchor="start" fill="#333">${d.label}</text>`;
+      if(d.label) out += `<text x="${x+6}" y="${Y((d.y1+d.y2)/2)}" font-size="10" text-anchor="start" fill="#333">${d.label}</text>`;
     } else if(d.type==='h1'){
       const y=Y(d.y);
       out += `<line x1="${X(d.x1)}" y1="${y}" x2="${X(d.x2)}" y2="${y}" stroke="#333" stroke-width="1" marker-end="url(#sbArr)"/>`;
-      out += `<text x="${X((d.x1+d.x2)/2)}" y="${y-6}" font-size="10" text-anchor="middle" fill="#333">${d.label}</text>`;
+      if(d.label) out += `<text x="${X((d.x1+d.x2)/2)}" y="${y-6}" font-size="10" text-anchor="middle" fill="#333">${d.label}</text>`;
     }
   });
   tpl.note.split('\n').forEach((line,i)=>{
