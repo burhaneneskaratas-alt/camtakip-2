@@ -1099,7 +1099,7 @@ async function submitWorkshopOrder(){
     renk: document.getElementById('w_isicam').checked
       ? buildIsicamText('w')
       : segVal('w_renk'),
-    lines: linesClean.map(l=>({w:parseFloat(l.w), h:parseFloat(l.h), qty:parseInt(l.qty), note:l.note||'', dm:l.dm||[], sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:l.isicam||{}, fiyat:document.getElementById('w_fiyat').value||''})),
+    lines: linesClean.map(l=>({w:parseFloat(l.w), h:parseFloat(l.h), qty:parseInt(l.qty), note:l.note||'', dm:l.dm||[], delikSablon:l.delikSablon||null, sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:l.isicam||{}, fiyat:document.getElementById('w_fiyat').value||''})),
     note: document.getElementById('w_note').value,
     asc_customer_code: document.getElementById('w_asc_code').value.trim() || null,
     due: document.getElementById('w_due').value || null,
@@ -2108,7 +2108,7 @@ async function submitCustomerOrder(){
     renk: document.getElementById('c_isicam').checked
       ? buildIsicamText('c')
       : segVal('c_renk'),
-    lines: linesClean.map(l=>({w:parseFloat(l.w), h:parseFloat(l.h), qty:parseInt(l.qty), note:l.note||'', dm:l.dm||[], sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:l.isicam||{}, fiyat:l.fiyat||''})),
+    lines: linesClean.map(l=>({w:parseFloat(l.w), h:parseFloat(l.h), qty:parseInt(l.qty), note:l.note||'', dm:l.dm||[], delikSablon:l.delikSablon||null, sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:l.isicam||{}, fiyat:l.fiyat||''})),
     note: noteVal, due: existing ? existing.due : null, status:0
   };
   const wasEditing = editingOrderId;
@@ -2217,7 +2217,7 @@ function openEditOrder(o, isSellerView){
     setSegVal(prefix+'_renk', o.renk || 'Füme');
   }
 
-  lineState = (o.lines||[]).map(l=>({w:l.w, h:l.h, qty:l.qty, note:l.note||'', dm:(l.dm||[]).map(d=>({...d})), sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:(l.isicam && l.isicam.renk) ? {...l.isicam} : {...isicamState}, fiyat:l.fiyat||''}));
+  lineState = (o.lines||[]).map(l=>({w:l.w, h:l.h, qty:l.qty, note:l.note||'', dm:(l.dm||[]).map(d=>({...d})), delikSablon: l.delikSablon ? JSON.parse(JSON.stringify(l.delikSablon)) : null, sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:(l.isicam && l.isicam.renk) ? {...l.isicam} : {...isicamState}, fiyat:l.fiyat||''}));
   if(lineState.length===0) lineState.push({w:'',h:'',qty:1,note:'',sekilli:false, fiyat:'', isicam: {...isicamState}});
   renderLines();
 
