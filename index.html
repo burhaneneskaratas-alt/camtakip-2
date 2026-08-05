@@ -3737,13 +3737,42 @@ function parseCamAdi(label){
 // Bir siparişin tam form bloğunu (başlık+firma+müşteri+tablo+toplam+delik) verilen
 // satırdan (base+1) başlayarak çizer. Hem tekli export hem toplu export bunu kullanır.
 // base=0 → blok 1. satırdan başlar (eskisiyle birebir aynı). Dönen değer: bloğun kullandığı son satır.
+// Sipariş satırlarını Boy (h) değerine göre gruplar: aynı Boy'daki satırlar bitişik
+// yazılır (siparişte hangi sırayla girildiyse o sıra grup içinde korunur, gruplar
+// arasında ilk görülme sırası korunur), farklı bir Boy grubuna geçerken araya 1 boş
+// satır konur. "No" sütunu bu yeni (yazılan) sıraya göre numaralanır.
+// Döner: {rows:[{row, line, idx, no}], lastDataRow}
+function buildLinesRowPlan(lines, firstRow){
+  if(!lines.length) return {rows:[], lastDataRow: firstRow};
+  const groups = [];
+  const groupIdxByKey = new Map();
+  lines.forEach((line, idx)=>{
+    const key = String(parseFloat(line.h)||0);
+    if(!groupIdxByKey.has(key)){ groupIdxByKey.set(key, groups.length); groups.push([]); }
+    groups[groupIdxByKey.get(key)].push({line, idx});
+  });
+  const rows = [];
+  let r = firstRow;
+  groups.forEach((g, gi)=>{
+    if(gi>0) r++; // farklı Boy grubuna geçiş — önce 1 boş satır
+    g.forEach(item=>{
+      rows.push({row:r, line:item.line, idx:item.idx, no: rows.length+1});
+      r++;
+    });
+  });
+  return {rows, lastDataRow: r-1};
+}
+
 function drawOrderExcelBlock(wb, ws, o, base, delikSablonAnchors){
   const R = (n)=> base + n; // blok-içi göreli satırı, sayfadaki gerçek satıra çevirir
   const wsName = profile.workshop_name || profile.full_name || 'Atölye';
   const lines = o.lines || [];
   const firstRow = R(12); // veri satırları bloğun 12. satırından başlar (şablonla birebir aynı)
-  const lastDataRow = firstRow + Math.max(lines.length,1) - 1;
+  const rowPlan = buildLinesRowPlan(lines, firstRow); // Boy'a göre gruplu satır planı
+  const lastDataRow = rowPlan.lastDataRow;
   const totalRow = lastDataRow + 2; // toplam satırı, veri bloğundan 1 satır boşlukla ayrı
+  const rowByIdx = {}; // orijinal satır index -> yazıldığı gerçek Excel satırı (Fiyat bölümü için)
+  rowPlan.rows.forEach(p=>{ rowByIdx[p.idx] = p.row; });
 
   // Satır 1 — başlık
   ws.mergeCells(`A${R(1)}:I${R(1)}`);
@@ -3824,8 +3853,7 @@ function drawOrderExcelBlock(wb, ws, o, base, delikSablonAnchors){
   let toplamAdet = 0, toplamM2 = 0;
 
   // Veri satırları (siparişin ölçü/kalem listesi) — No | Genişlik | Yükseklik | Adet | m2 | Cam Rengi | Cam Özelliği | Delik/Poz
-  lines.forEach((l,i)=>{
-    const r = firstRow + i;
+  rowPlan.rows.forEach(({row:r, line:l, no})=>{
     const qty = parseInt(l.qty)||0, w = parseFloat(l.w)||0, h = parseFloat(l.h)||0;
     const tekM2 = (w*h)/1000000;
     const satirM2 = tekM2*qty;
@@ -3836,7 +3864,7 @@ function drawOrderExcelBlock(wb, ws, o, base, delikSablonAnchors){
     // Satırın kendine özel Isıcam'ı varsa (mini etiketten değiştirilmişse) o kullanılır,
     // yoksa sipariş genelindeki cam bilgisine düşer — etiket yazdırmayla aynı mantık.
     const { camRengi: camAdi, camOzelligi } = etiketCamBilgisi(o, l);
-    const vals = { A: i+1, B: w, C: h, D: qty, F: camAdi, G: camOzelligi, H: delikPoz };
+    const vals = { A: no, B: w, C: h, D: qty, F: camAdi, G: camOzelligi, H: delikPoz };
     Object.entries(vals).forEach(([col,val])=>{
       const cell = ws.getCell(`${col}${r}`);
       const isNum = col==='A'||col==='B'||col==='C'||col==='D';
@@ -3893,7 +3921,7 @@ function drawOrderExcelBlock(wb, ws, o, base, delikSablonAnchors){
     ws.getCell(`L${R(11)}`).value = 'Tutar (TL)';
     let genelTutar = 0;
     lines.forEach((l,i)=>{
-      const r = firstRow + i;
+      const r = rowByIdx[i]; // Boy'a göre gruplanmış gerçek satır (blok başlangıcından basit ofset değil)
       const qty = parseInt(l.qty)||0, w = parseFloat(l.w)||0, h = parseFloat(l.h)||0;
       const m2 = (w*h*qty)/1000000;
       const fiyat = parseFloat(l.fiyat)||0;
@@ -3920,7 +3948,10 @@ function drawOrderExcelBlock(wb, ws, o, base, delikSablonAnchors){
 // önlemede kullanılıyor).
 function estimateBlockRows(o){
   const lines = o.lines || [];
-  const totalRow = 13 + Math.max(lines.length,1); // drawOrderExcelBlock'taki totalRow ile birebir aynı formül (base=0)
+  // drawOrderExcelBlock'taki (base=0) firstRow=12 ile birebir aynı, Boy'a göre
+  // gruplama (araya giren boş satırlar dahil) da aynı yardımcı fonksiyonla hesaplanıyor.
+  const lastDataRow = buildLinesRowPlan(lines, 12).lastDataRow;
+  const totalRow = lastDataRow + 2;
   const dmLines = lines.filter(l=>l.dm && l.dm.length);
   const delikSablonLines = lines.filter(l=>l.delikSablon && l.delikSablon.sablon);
   if(!dmLines.length && !delikSablonLines.length) return totalRow;
