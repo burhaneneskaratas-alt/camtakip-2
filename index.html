@@ -4099,7 +4099,11 @@ function ascBuildRow(itemNo, camKoduTip, custCode, w, h, qty, ekBilgi, not1, fir
   row += ascPadR(camKoduTip, 17) + itemNoStr4;        // 0:21
   row += ascPadR(ascUp(custCode), 20);                 // 21:41 (Optime'daki "Customer" kısa kodu)
   row += ascPadR('', 12);                              // 41:53 (bilinmiyor) — denendi, Notes kutusuna yansımadı, boş bırakılıyor
-  row += ascPadL('1.0', 3);                            // 53:56
+  // 53:56 — Grinding. Kural: camın en küçük kenarı (En/Boy'un küçüğü) 300mm'nin
+  // altındaysa 3mm, 300mm ve üstündeyse 1mm.
+  const ascKucukKenar = Math.min(Number(w)||0, Number(h)||0);
+  const ascGrinding = (ascKucukKenar > 0 && ascKucukKenar < 300) ? '3.0' : '1.0';
+  row += ascPadL(ascGrinding, 3);                      // 53:56
   row += ' '.repeat(7);                                // 56:63
   row += '0Y';                                         // 63:65
   row += ascPadL(String(qty||1), 8);                   // 65:73 — Q.ty (adet), artık gerçek sayı yazılıyor
