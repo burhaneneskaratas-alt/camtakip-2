@@ -8,6 +8,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 <style>
   :root{
     --bg:#EEF1F6; --surface:#FFFFFF; --surface-2:#F4F6FA;
@@ -76,7 +77,7 @@
   .hint{font-size:12px; color:var(--text-dim);}
   .err{font-size:12px; color:var(--danger);}
   .lines-wrap{border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; margin-bottom:12px; background:var(--surface-2);}
-  .line-row{display:grid; grid-template-columns:0.8fr 0.8fr 55px 1.1fr 40px 85px 120px 30px; gap:8px; align-items:center; margin-bottom:8px;}
+  .line-row{display:grid; grid-template-columns:0.8fr 0.8fr 55px 1.1fr 40px 85px 120px 44px 30px; gap:8px; align-items:center; margin-bottom:8px;}
   .line-sekilli{display:flex; align-items:center; gap:2px; font-size:10px; color:var(--text-dim); cursor:pointer; white-space:nowrap;}
   .line-sekilli input{width:14px; height:14px; margin:0;}
   .line-sekil-foto{display:flex; align-items:center; gap:8px; margin:-4px 0 10px 0; padding-left:4px;}
@@ -86,10 +87,10 @@
   .line-m2{font-size:12.5px; color:var(--accent); text-align:right; white-space:nowrap; font-weight:700;}
   .line-del{background:transparent; border:none; color:var(--text-dim); cursor:pointer; font-size:16px; padding:4px; border-radius:var(--radius-pill);}
   .line-del:hover{color:var(--danger); background:rgba(220,38,38,0.08);}
-  .line-dm{background:transparent; border:1px solid var(--border); color:var(--text-dim); cursor:pointer; font-size:13px; padding:4px 6px; border-radius:var(--radius-sm); white-space:nowrap;}
-  .line-dm.has-data{color:var(--accent); border-color:var(--accent);}
-  .line-dm:hover{color:var(--accent); border-color:var(--accent);}
-  .line-labels{display:grid; grid-template-columns:0.8fr 0.8fr 55px 1.1fr 40px 85px 120px 30px; gap:8px; margin-bottom:6px;}
+  .line-delik-sablon{background:transparent; border:1px solid var(--border); color:var(--text-dim); cursor:pointer; font-size:13px; padding:4px 6px; border-radius:var(--radius-sm); white-space:nowrap;}
+  .line-delik-sablon.has-data{color:var(--accent); border-color:var(--accent);}
+  .line-delik-sablon:hover{color:var(--accent); border-color:var(--accent);}
+  .line-labels{display:grid; grid-template-columns:0.8fr 0.8fr 55px 1.1fr 40px 85px 120px 44px 30px; gap:8px; margin-bottom:6px;}
   .line-labels span{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.04em; font-weight:700;}
   .lines-total{display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);}
   .lines-total-val{font-family:var(--font-display); font-size:18px; font-weight:800; color:var(--accent);}
@@ -208,7 +209,22 @@
   </div>
 </div>
 
-<!-- Delik/Menfez kroki editörü kaldırıldı — sadece "Delik/Poz" not alanı kullanılıyor artık. -->
+<!-- ====== Delik/Poz Şablon Paneli — VBA şablonlarının birebir aynısı, sabit geometri ====== -->
+<div id="ds_overlay" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(15,18,28,0.55); align-items:center; justify-content:center; padding:20px;">
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); width:100%; max-width:420px; max-height:92vh; overflow-y:auto; padding:20px;">
+    <div style="font-family:var(--font-display); font-weight:700; font-size:15px; margin-bottom:12px;">🔧 Delik/Poz Şablonu</div>
+    <div id="ds_gallery" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:12px;"></div>
+    <div id="ds_detail" style="display:none;">
+      <button class="btn btn-ghost btn-sm" id="ds_back" style="margin-bottom:10px;">← Şablon listesine dön</button>
+      <div id="ds_detailTitle" style="font-weight:700; margin-bottom:8px;"></div>
+      <div id="ds_canvasWrap" style="position:relative; margin:0 auto 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm);"></div>
+      <div class="form-actions">
+        <button class="btn btn-primary btn-sm" id="ds_save">Ekle</button>
+        <button class="btn btn-ghost btn-sm" id="ds_cancel">İptal</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 const SETUP_MISSING = SUPABASE_URL.includes('BURAYA') || SUPABASE_ANON_KEY.includes('BURAYA');
@@ -925,7 +941,7 @@ function renderWorkshop(){
       </div>
       <div class="field" style="margin-bottom:6px;"><label>Ölçüler</label></div>
       <div class="lines-wrap">
-        <div class="line-labels"><span>En (mm)</span><span>Boy (mm)</span><span>Adet</span><span>Delik/Poz</span><span></span><span>m²</span><span>Isıcam</span><span></span></div>
+        <div class="line-labels"><span>En (mm)</span><span>Boy (mm)</span><span>Adet</span><span>Delik/Poz</span><span></span><span>m²</span><span>Isıcam</span><span></span><span></span></div>
         <div id="w_lines"></div>
         <button class="btn btn-ghost btn-sm" id="w_addLine" style="margin-top:6px;">+ Ölçü ekle</button>
         <button class="btn btn-ghost btn-sm" id="w_mrBtn" style="margin-top:6px;">📷 Fotoğraftan ölçü oku</button>
@@ -1979,7 +1995,7 @@ function renderCustomer(){
       </div>
       <div class="field" style="margin-bottom:6px;"><label>Ölçüler</label></div>
       <div class="lines-wrap">
-        <div class="line-labels"><span>En (mm)</span><span>Boy (mm)</span><span>Adet</span><span>Delik/Poz</span><span></span><span>m²</span><span>Isıcam</span><span></span></div>
+        <div class="line-labels"><span>En (mm)</span><span>Boy (mm)</span><span>Adet</span><span>Delik/Poz</span><span></span><span>m²</span><span>Isıcam</span><span></span><span></span></div>
         <div id="c_lines"></div>
         <button class="btn btn-ghost btn-sm" id="c_addLine" style="margin-top:6px;">+ Ölçü ekle</button>
         <button class="btn btn-ghost btn-sm" id="c_mrBtn" style="margin-top:6px;">📷 Fotoğraftan ölçü oku</button>
@@ -2252,6 +2268,7 @@ function renderLines(){
       </label>
       <span class="line-m2">${fmtM2(lineM2(l))}</span>
       ${isicamEnabled ? `<span class="line-isicam-compact" data-idx="${i}" style="font-size:11px;color:var(--text-mut);cursor:pointer;padding:4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);white-space:nowrap;display:inline-block;user-select:none;" title="Tıkla: Bu satırın Isıcam'ını düzenle">${(l.isicam?.dis||4)}+${(l.isicam?.bosluk||12)}+${(l.isicam?.ic||4)} ${(l.isicam?.renk||'—')}</span>` : `<span></span>`}
+      <button class="line-delik-sablon ${l.delikSablon?'has-data':''}" data-idx="${i}" title="Delik/Poz şablonu seç">🔧${l.delikSablon?' 1':''}</button>
       <button class="line-del" data-idx="${i}" title="Satırı sil">×</button>
     </div>
     ${l.sekilli ? `
@@ -2363,6 +2380,9 @@ function renderLines(){
   });
   el.querySelectorAll('.line-del').forEach(btn=>{
     btn.onclick = ()=> removeLine(parseInt(btn.dataset.idx));
+  });
+  el.querySelectorAll('.line-delik-sablon').forEach(btn=>{
+    btn.onclick = ()=> openDelikSablonPanel(parseInt(btn.dataset.idx));
   });
   el.querySelectorAll('.line-isicam-compact').forEach(span=>{
     span.onclick = ()=> openIsicamLineEditor(parseInt(span.dataset.idx));
@@ -2725,6 +2745,453 @@ function renderDusakabinResult(previewImg, data){
 }
 
 // Delik/Menfez kroki editörü kaldırıldı (2026-08-05) — Delik/Poz not alanı yeterli.
+
+// ====================================================================
+// DELİK/POZ ŞABLON PANELİ — VBA'daki Kuante_Cam_Sablon_Modulu.txt'nin
+// birebir aynısı. Şeklin geometrisi (konum/boyut) SABİTTİR, kullanıcının
+// girdiği cm değeri sadece oka etiket olarak eklenir — asla koordinat
+// hesaplamasına karışmaz. Birim: nokta (VBA'daki Shape.Left/Top ile aynı).
+// Sadece 1 şablon var şu an (Çift Kol Delikli Cam) — onay sonrası diğer 5'i
+// aynı desenle eklenecek.
+// ====================================================================
+const DELIK_SABLON_TANIMLARI = {
+  cift_kol_delikli: {
+    ad: 'Çift Kol Delikli Cam',
+    viewBox: {x:90, y:40, w:280, h:370},
+    glass: {x:150, y:70, w:120, h:220},
+    holes: [
+      {x:150+120-45, y:70+50, w:24, h:14},
+      {x:150+120-45, y:70+110, w:24, h:14}
+    ],
+    arrows: [
+      {id:'ok_1', type:'single', x1:150+120-21, y1:70+57,  x2:150+120+25, y2:70+57,  labelX:150+120+30, labelY:70+57},
+      {id:'ok_2', type:'single', x1:150+120-21, y1:70+117, x2:150+120+25, y2:70+117, labelX:150+120+30, labelY:70+117},
+      {id:'ok_3', type:'double', x:150+120+12, y1:70+64, y2:70+110, labelX:150+120+22, labelY:70+87},
+      {id:'ok_4', type:'single', x1:150+35, y1:70+220, x2:150+35, y2:70+220+40, labelX:150+35, labelY:70+220+45}
+    ],
+    note: 'çift kol delikli camlar için\nkol delikleri boydan merkez delinecek',
+    noteX: 150-20, noteY: 70+220+45
+  },
+  aski_cift_kol: {
+    ad: 'Askı + Çift Kol Delikli',
+    viewBox: {x:90, y:10, w:270, h:440},
+    glass: {x:150, y:80, w:140, h:260},
+    holes: [
+      {x:150+15, y:80+15, w:14, h:14},
+      {x:150+140-15-14, y:80+15, w:14, h:14},
+      {x:150+15, y:80+260-15-14, w:14, h:14},
+      {x:150+140-15-14, y:80+260-15-14, w:14, h:14},
+      {x:150+140-25-14, y:80+90, w:14, h:14},
+      {x:150+140-25-14, y:80+150, w:14, h:14}
+    ],
+    arrows: [
+      {id:'ok_1', type:'single', x1:150+22, y1:80+15, x2:150+22, y2:80-20},
+      {id:'ok_2', type:'single', x1:150+15, y1:80+22, x2:150-20, y2:80+22},
+      {id:'ok_3', type:'single', x1:150+140-22, y1:80+15, x2:150+140-22, y2:80-20},
+      {id:'ok_4', type:'single', x1:150+140-15, y1:80+22, x2:150+140+20, y2:80+22},
+      {id:'ok_5', type:'single', x1:150+140-15, y1:80+97, x2:150+140+25, y2:80+97},
+      {id:'ok_6', type:'single', x1:150+140-15, y1:80+157, x2:150+140+25, y2:80+157},
+      {id:'ok_7', type:'double', x:150+140+15, y1:80+104, y2:80+150},
+      {id:'ok_8', type:'single', x1:150+15, y1:80+260-22, x2:150-20, y2:80+260-22},
+      {id:'ok_9', type:'single', x1:150+22, y1:80+260-15, x2:150+22, y2:80+260+20},
+      {id:'ok_10', type:'single', x1:150+140-15, y1:80+260-22, x2:150+140+20, y2:80+260-22},
+      {id:'ok_11', type:'single', x1:150+140-22, y1:80+260-15, x2:150+140-22, y2:80+260+20},
+      {id:'ok_12', type:'single', x1:150+70, y1:80+260, x2:150+70, y2:80+260+40}
+    ],
+    note: 'askı ve çift kol delikli camlar için\nkol delikleri boydan merkez delinecek',
+    noteX: 150-30, noteY: 80+260+45
+  },
+  mentese2: {
+    ad: '2 Menteşeli Cam',
+    viewBox: {x:110, y:0, w:270, h:410},
+    glass: {x:160, y:70, w:110, h:280},
+    holes: [
+      {x:160+10, y:70+15, w:14, h:14},
+      {x:160+10, y:70+90, w:14, h:14},
+      {x:160+10, y:70+160, w:14, h:14},
+      {x:160+10, y:70+280-25, w:14, h:14},
+      {x:160+110-25, y:70+70, w:14, h:14},
+      {x:160+110-25, y:70+170, w:14, h:14}
+    ],
+    arrows: [
+      {id:'ok_1', type:'single', x1:160+17, y1:70+15, x2:160+17, y2:70-20},
+      {id:'ok_2', type:'single', x1:160+10, y1:70+22, x2:160-20, y2:70+22},
+      {id:'ok_3', type:'double', x:160-12, y1:70+22, y2:70+90},
+      {id:'ok_4', type:'single', x1:160+10, y1:70+97, x2:160-20, y2:70+97},
+      {id:'ok_5', type:'single', x1:160+10, y1:70+167, x2:160-20, y2:70+167},
+      {id:'ok_6', type:'double', x:160-12, y1:70+167, y2:70+280-18},
+      {id:'ok_7', type:'single', x1:160+10, y1:70+280-18, x2:160-20, y2:70+280-18},
+      {id:'ok_8', type:'single', x1:160+17, y1:70+280-11, x2:160+17, y2:70+280+20},
+      {id:'ok_9', type:'single', x1:160+110-11, y1:70+77, x2:160+110+50, y2:70+77},
+      {id:'ok_10', type:'single', x1:160+110-11, y1:70+177, x2:160+110+50, y2:70+177},
+      {id:'ok_11', type:'double', x:160+110+15, y1:70+84, y2:70+170},
+      {id:'ok_12', type:'single', x1:160+55, y1:70+280, x2:160+55, y2:70+280+35}
+    ],
+    note: 'menteşe ve çift kol delikli camlar\nkol delikleri boydan merkez delinecek',
+    noteX: 160-30, noteY: 70+280+40
+  },
+  mentese3: {
+    ad: '3 Menteşeli Cam',
+    viewBox: {x:100, y:-10, w:290, h:440},
+    glass: {x:160, y:60, w:140, h:320},
+    holes: [
+      {x:160+10, y:60+15, w:14, h:14},
+      {x:160+10, y:60+65, w:14, h:14},
+      {x:160+10, y:60+120, w:14, h:14},
+      {x:160+10, y:60+175, w:14, h:14},
+      {x:160+10, y:60+235, w:14, h:14},
+      {x:160+10, y:60+290, w:14, h:14},
+      {x:160+140-25, y:60+120, w:14, h:14},
+      {x:160+140-25, y:60+195, w:14, h:14}
+    ],
+    arrows: [
+      {id:'ok_1', type:'single', x1:160+17, y1:60+15, x2:160+17, y2:60-15},
+      {id:'ok_2', type:'single', x1:160+10, y1:60+22, x2:160-18, y2:60+22},
+      {id:'ok_3', type:'double', x:160-10, y1:60+22, y2:60+65},
+      {id:'ok_4', type:'single', x1:160+10, y1:60+72, x2:160-18, y2:60+72},
+      {id:'ok_5', type:'single', x1:160+10, y1:60+127, x2:160-18, y2:60+127},
+      {id:'ok_6', type:'single', x1:160+22, y1:60+127, x2:160+22, y2:60-35},
+      {id:'ok_7', type:'double', x:160-10, y1:60+127, y2:60+175},
+      {id:'ok_8', type:'single', x1:160+10, y1:60+182, x2:160-18, y2:60+182},
+      {id:'ok_9', type:'single', x1:160+10, y1:60+242, x2:160-18, y2:60+242},
+      {id:'ok_10', type:'double', x:160-10, y1:60+242, y2:60+290},
+      {id:'ok_11', type:'single', x1:160+10, y1:60+297, x2:160-18, y2:60+297},
+      {id:'ok_12', type:'single', x1:160+17, y1:60+304, x2:160+17, y2:60+340},
+      {id:'ok_13', type:'single', x1:160+140-11, y1:60+127, x2:160+140+35, y2:60+127},
+      {id:'ok_14', type:'single', x1:160+140-11, y1:60+202, x2:160+140+35, y2:60+202},
+      {id:'ok_15', type:'double', x:160+140+20, y1:60+134, y2:60+195},
+      {id:'ok_16', type:'single', x1:160+140-18, y1:60+209, x2:160+140-18, y2:60+345}
+    ],
+    note: '',
+    noteX: 0, noteY: 0
+  },
+  isi_cam_baca: {
+    ad: 'Isı Cam + Baca Deliği',
+    viewBox: {x:80, y:10, w:220, h:330},
+    glass: {x:150, y:70, w:140, h:250},
+    holes: [
+      {x:150+45, y:70+35, w:50, h:50}
+    ],
+    arrows: [
+      {id:'ok_1', type:'single', x1:150+70, y1:70+35, x2:150+70, y2:70-25},
+      {id:'ok_2', type:'single', x1:150+45, y1:70+60, x2:150-30, y2:70+60}
+    ],
+    note: '',
+    noteX: 0, noteY: 0
+  },
+  cift_menteseli_camlar: {
+    ad: 'Çift Menteşeli Camlar',
+    multiPanel: true,
+    viewBox: {x:40, y:20, w:450, h:400},
+    panels: {
+      sol: {
+        glass: {x:60, y:70, w:110, h:230},
+        holes: [
+          {x:60+110-20, y:70+15, w:14, h:14},
+          {x:60+110-20, y:70+80, w:14, h:14},
+          {x:60+110-20, y:70+130, w:14, h:14},
+          {x:60+110-20, y:70+230-25, w:14, h:14}
+        ],
+        arrows: [
+          {id:'ok_1', type:'single', x1:60+110-13, y1:70+15, x2:60+110-13, y2:70-15},
+          {id:'ok_2', type:'single', x1:60+110-6, y1:70+22, x2:60+110+20, y2:70+22},
+          {id:'ok_3', type:'double', x:60+110+12, y1:70+29, y2:70+80},
+          {id:'ok_4', type:'single', x1:60+110-6, y1:70+87, x2:60+110+25, y2:70+87},
+          {id:'ok_5', type:'single', x1:60+110-6, y1:70+137, x2:60+110+25, y2:70+137},
+          {id:'ok_6', type:'double', x:60+110+12, y1:70+144, y2:70+230-25},
+          {id:'ok_7', type:'single', x1:60+110-6, y1:70+230-18, x2:60+110+20, y2:70+230-18},
+          {id:'ok_8', type:'single', x1:60+110-13, y1:70+230-11, x2:60+110-13, y2:70+230+20}
+        ],
+        // "BURAYA CAM ÖLÇÜSÜ" — VBA'da tek bu şablonun bu tek okunda var. Kural (5.1):
+        // ayrı giriş kutusu YOK, satırın kendi Boy (h) alanından otomatik/salt-okunur.
+        camOlcuArrow: {x1:60+30, y1:70+230, x2:60+30, y2:70+230+45},
+        camOlcuLabel: 'BURAYA CAM ÖLÇÜSÜ',
+        note: '', noteX:0, noteY:0
+      },
+      sag: {
+        glass: {x:260, y:70, w:110, h:230},
+        holes: [
+          {x:260+10, y:70+15, w:14, h:14},
+          {x:260+10, y:70+75, w:14, h:14},
+          {x:260+10, y:70+125, w:14, h:14},
+          {x:260+10, y:70+230-25, w:14, h:14},
+          {x:260+110-20, y:70+80, w:14, h:14},
+          {x:260+110-20, y:70+130, w:14, h:14}
+        ],
+        arrows: [
+          {id:'ok_1', type:'single', x1:260+17, y1:70+15, x2:260+17, y2:70-15},
+          {id:'ok_2', type:'single', x1:260+10, y1:70+22, x2:260-18, y2:70+22},
+          {id:'ok_3', type:'double', x:260-10, y1:70+22, y2:70+75},
+          {id:'ok_4', type:'single', x1:260+10, y1:70+82, x2:260-18, y2:70+82},
+          {id:'ok_5', type:'single', x1:260+10, y1:70+132, x2:260-18, y2:70+132},
+          {id:'ok_6', type:'double', x:260-10, y1:70+132, y2:70+230-25},
+          {id:'ok_7', type:'single', x1:260+10, y1:70+230-18, x2:260-18, y2:70+230-18},
+          {id:'ok_8', type:'single', x1:260+17, y1:70+230-11, x2:260+17, y2:70+230+20},
+          {id:'ok_9', type:'single', x1:260+110-6, y1:70+87, x2:260+110+25, y2:70+87},
+          {id:'ok_10', type:'single', x1:260+110-6, y1:70+137, x2:260+110+25, y2:70+137},
+          {id:'ok_11', type:'double', x:260+110+15, y1:70+94, y2:70+130},
+          {id:'ok_12', type:'single', x1:260+55, y1:70+230, x2:260+55, y2:70+230+35}
+        ],
+        camOlcuArrow: null,
+        note: 'MENTEŞE DELİKLİ CAMLAR İÇİN\nÇİFT kol delikleri boydan merkez delinecek',
+        noteX: 260-20, noteY: 70+230+40
+      }
+    }
+  }
+};
+
+// Çoğu şablon tek panelli (kendisi); Çift Menteşeli Camlar 2 panelli. Bu fonksiyon
+// her ikisini de aynı listeye normalize eder — render/export kodu tek yerden geçer.
+function dsTemplatePanels(tpl){
+  if(tpl.multiPanel) return [
+    Object.assign({key:'sol'}, tpl.panels.sol),
+    Object.assign({key:'sag'}, tpl.panels.sag)
+  ];
+  return [{key:null, glass:tpl.glass, holes:tpl.holes, arrows:tpl.arrows, note:tpl.note, noteX:tpl.noteX, noteY:tpl.noteY, camOlcuArrow:null}];
+}
+
+function dsRenderSVG(tpl){
+  const vb = tpl.viewBox;
+  let out = `<svg viewBox="${vb.x} ${vb.y} ${vb.w} ${vb.h}" style="display:block; width:100%; height:auto;">`;
+  out += `<defs><marker id="dsArrEnd" markerWidth="8" markerHeight="8" refX="6" refY="3" orient="auto"><path d="M0,0 L6,3 L0,6 Z" fill="#000"/></marker><marker id="dsArrStart" markerWidth="8" markerHeight="8" refX="2" refY="3" orient="auto"><path d="M8,0 L2,3 L8,6 Z" fill="#000"/></marker></defs>`;
+  dsTemplatePanels(tpl).forEach(p=>{
+    out += `<rect x="${p.glass.x}" y="${p.glass.y}" width="${p.glass.w}" height="${p.glass.h}" fill="#F5F7FA" stroke="#000" stroke-width="1.5"/>`;
+    p.holes.forEach(h=>{
+      out += `<ellipse cx="${h.x+h.w/2}" cy="${h.y+h.h/2}" rx="${h.w/2}" ry="${h.h/2}" fill="#fff" stroke="#000" stroke-width="1"/>`;
+    });
+    p.arrows.forEach(a=>{
+      if(a.type==='single'){
+        out += `<line x1="${a.x1}" y1="${a.y1}" x2="${a.x2}" y2="${a.y2}" stroke="#000" stroke-width="1" marker-end="url(#dsArrEnd)"/>`;
+      } else {
+        out += `<line x1="${a.x}" y1="${a.y1}" x2="${a.x}" y2="${a.y2}" stroke="#000" stroke-width="1" marker-end="url(#dsArrEnd)" marker-start="url(#dsArrStart)"/>`;
+      }
+    });
+    if(p.camOlcuArrow){
+      const a = p.camOlcuArrow;
+      out += `<line x1="${a.x1}" y1="${a.y1}" x2="${a.x2}" y2="${a.y2}" stroke="#000" stroke-width="1" marker-end="url(#dsArrEnd)"/>`;
+      out += `<text x="${a.x1-40}" y="${a.y2+10}" font-size="7" fill="#000">${p.camOlcuLabel||''}</text>`;
+    }
+    if(p.note) p.note.split('\n').forEach((line,i)=>{
+      out += `<text x="${p.noteX}" y="${p.noteY+12+(i*12)}" font-size="9" fill="#000">${line}</text>`;
+    });
+  });
+  out += `</svg>`;
+  return out;
+}
+
+// Ok etiketinin (cm kutusu) konumunu ok geometrisinden otomatik türetir — elle
+// hesaplanan koordinatlarda hata riskini azaltmak için. Tek yönlü ok: ucun biraz
+// ilerisinde (ok yönünde). Çift yönlü ok: ortada, sağa doğru hafif kaymış.
+function dsAutoLabel(a){
+  if(a.type==='double') return {x:a.x+10, y:(a.y1+a.y2)/2};
+  const dx=a.x2-a.x1, dy=a.y2-a.y1, len=Math.hypot(dx,dy)||1;
+  return {x:a.x2+(dx/len)*10, y:a.y2+(dy/len)*10};
+}
+
+let dsCtx = null; // {lineIdx, sablon}
+function openDelikSablonPanel(lineIdx){
+  dsCtx = {lineIdx, sablon:null};
+  document.getElementById('ds_overlay').style.display = 'flex';
+  document.getElementById('ds_detail').style.display = 'none';
+  document.getElementById('ds_gallery').style.display = 'grid';
+  renderDsGallery();
+}
+function renderDsGallery(){
+  const gal = document.getElementById('ds_gallery');
+  gal.innerHTML = Object.keys(DELIK_SABLON_TANIMLARI).map(key=>{
+    const t = DELIK_SABLON_TANIMLARI[key];
+    return `<div class="sb-card" data-key="${key}" style="border:1px solid var(--border); border-radius:var(--radius-sm); padding:6px; cursor:pointer; background:var(--surface-2); text-align:center;">
+      ${dsRenderSVG(t)}
+      <div style="font-size:11px; font-weight:600; margin-top:4px;">${t.ad}</div>
+    </div>`;
+  }).join('');
+  gal.querySelectorAll('[data-key]').forEach(card=>{
+    card.onclick = ()=> openDsDetail(card.dataset.key);
+  });
+}
+function openDsDetail(key){
+  dsCtx.sablon = key;
+  const tpl = DELIK_SABLON_TANIMLARI[key];
+  document.getElementById('ds_gallery').style.display = 'none';
+  document.getElementById('ds_detail').style.display = 'block';
+  document.getElementById('ds_detailTitle').textContent = tpl.ad;
+  const wrap = document.getElementById('ds_canvasWrap');
+  wrap.style.aspectRatio = `${tpl.viewBox.w} / ${tpl.viewBox.h}`;
+  wrap.innerHTML = dsRenderSVG(tpl);
+  const mevcutLine = lineState[dsCtx.lineIdx];
+  const mevcutSablon = (mevcutLine && mevcutLine.delikSablon && mevcutLine.delikSablon.sablon===key) ? mevcutLine.delikSablon : null;
+  dsTemplatePanels(tpl).forEach(p=>{
+    const prefix = p.key ? p.key+'_' : '';
+    const existing = tpl.multiPanel
+      ? ((mevcutSablon && mevcutSablon.paneller && mevcutSablon.paneller[p.key]) ? mevcutSablon.paneller[p.key].olculer : {})
+      : (mevcutSablon ? mevcutSablon.olculer : {});
+    p.arrows.forEach(a=>{
+      const lbl = dsAutoLabel(a);
+      const inp = document.createElement('input');
+      inp.type = 'number'; inp.step = '0.1'; inp.placeholder = 'cm';
+      inp.id = 'ds_inp_'+prefix+a.id;
+      inp.value = (existing[a.id]!=null) ? existing[a.id] : '';
+      inp.style.cssText = `position:absolute; width:46px; padding:2px 3px; font-size:11px; text-align:center; border:1.5px solid var(--accent); border-radius:3px; background:#fff; left:${(lbl.x-tpl.viewBox.x)/tpl.viewBox.w*100}%; top:${(lbl.y-tpl.viewBox.y)/tpl.viewBox.h*100}%; transform:translate(-50%,-50%);`;
+      wrap.appendChild(inp);
+    });
+    // "BURAYA CAM ÖLÇÜSÜ" (kural 5.1): giriş kutusu yok, satırın kendi Boy (h)
+    // alanından salt-okunur gösteriliyor.
+    if(p.camOlcuArrow){
+      const lbl = dsAutoLabel({type:'single', x1:p.camOlcuArrow.x1, y1:p.camOlcuArrow.y1, x2:p.camOlcuArrow.x2, y2:p.camOlcuArrow.y2});
+      const disp = document.createElement('div');
+      const hVal = (mevcutLine && mevcutLine.h) ? mevcutLine.h+' mm' : '(Boy girilmedi)';
+      disp.textContent = hVal;
+      disp.style.cssText = `position:absolute; font-size:10.5px; font-weight:700; color:var(--text-dim); background:var(--surface-2); border:1px dashed var(--border); border-radius:3px; padding:2px 5px; left:${(lbl.x-tpl.viewBox.x)/tpl.viewBox.w*100}%; top:${(lbl.y-tpl.viewBox.y)/tpl.viewBox.h*100}%; transform:translate(-50%,-50%); white-space:nowrap;`;
+      wrap.appendChild(disp);
+    }
+  });
+}
+document.getElementById('ds_back').onclick = ()=>{
+  document.getElementById('ds_detail').style.display = 'none';
+  document.getElementById('ds_gallery').style.display = 'grid';
+};
+document.getElementById('ds_cancel').onclick = ()=>{
+  document.getElementById('ds_overlay').style.display = 'none';
+  dsCtx = null;
+};
+document.getElementById('ds_save').onclick = ()=>{
+  if(!dsCtx || !dsCtx.sablon) return;
+  const tpl = DELIK_SABLON_TANIMLARI[dsCtx.sablon];
+  const readPanelOlculer = (p, prefix)=>{
+    const olculer = {};
+    p.arrows.forEach(a=>{
+      const v = document.getElementById('ds_inp_'+prefix+a.id).value;
+      olculer[a.id] = (v!=='' && v!=null) ? parseFloat(v) : null;
+    });
+    return olculer;
+  };
+  if(tpl.multiPanel){
+    const paneller = {};
+    dsTemplatePanels(tpl).forEach(p=>{ paneller[p.key] = {olculer: readPanelOlculer(p, p.key+'_')}; });
+    lineState[dsCtx.lineIdx].delikSablon = {sablon: dsCtx.sablon, paneller};
+  } else {
+    const olculer = readPanelOlculer(tpl, '');
+    lineState[dsCtx.lineIdx].delikSablon = {sablon: dsCtx.sablon, olculer};
+  }
+  document.getElementById('ds_overlay').style.display = 'none';
+  dsCtx = null;
+  renderLines();
+};
+
+// ====================================================================
+// EXCEL EXPORT ENJEKSİYONU — ExcelJS 4.4.0 shape (dikdörtgen/oval/ok) çizmiyor,
+// bu yüzden workbook üretildikten sonra .xlsx (zip) açılıp içine gerçek
+// xdr:sp / xdr:cxnSp XML'i elle eklenip yeniden paketleniyor.
+// Koordinat birimi: nokta. EMU = nokta × 12700 (VBA.xlsx'ten doğrulandı).
+// ====================================================================
+const EMU_PER_PT = 12700;
+const DS_DEFAULT_ROW_PT = 15; // proje genelinde varsayılan satır yüksekliği (bkz. EXCEL_ROWS_PER_A4_PAGE yorumu) — sayfada özel satır yüksekliği yok
+function dsEmu(pt){ return Math.round(pt*EMU_PER_PT); }
+function dsXmlEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+// 0-indeksli satırın sayfa üzerindeki mutlak Y'si (EMU) — absoluteAnchor için.
+function dsRowTopEmu(row){ return Math.round(row * DS_DEFAULT_ROW_PT * EMU_PER_PT); }
+
+// Dikdörtgen/oval (dolgulu, çerçeveli) — VBA CizCam/CizDelik karşılığı.
+// xEmu/yEmu: sayfanın mutlak sol-üstüne göre gerçek EMU konumu (a:off'un GERÇEK
+// değeri olmalı — VBA.xlsx'ten çıkarılan gerçek örnekte a:off hep gerçek konumu
+// taşıyordu, "0,0" değil; bunu atlayınca şekiller yanlış yerde toplanıyordu).
+function dsOoxmlShape(id, name, xEmu, yEmu, cx, cy, prst, fillHex, lineHex, lineWEmu){
+  return `<xdr:absoluteAnchor><xdr:pos x="${xEmu}" y="${yEmu}"/><xdr:ext cx="${cx}" cy="${cy}"/><xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="${dsXmlEsc(name)}"/><xdr:cNvSpPr/></xdr:nvSpPr><xdr:spPr><a:xfrm><a:off x="${xEmu}" y="${yEmu}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="${prst}"><a:avLst/></a:prstGeom><a:solidFill><a:srgbClr val="${fillHex}"/></a:solidFill><a:ln w="${lineWEmu}"><a:solidFill><a:srgbClr val="${lineHex}"/></a:solidFill></a:ln></xdr:spPr><xdr:txBody><a:bodyPr/><a:lstStyle/><a:p><a:endParaRPr lang="tr-TR"/></a:p></xdr:txBody></xdr:sp><xdr:clientData/></xdr:absoluteAnchor>`;
+}
+// Ok/çift ok (bağlayıcı çizgi) — VBA CizOk/CizCiftYonuOk karşılığı.
+function dsOoxmlConnector(id, name, x1Emu, y1Emu, x2Emu, y2Emu, doubleHeaded){
+  const xEmu=Math.min(x1Emu,x2Emu), yEmu=Math.min(y1Emu,y2Emu), cx=Math.abs(x2Emu-x1Emu), cy=Math.abs(y2Emu-y1Emu);
+  const flipH = x1Emu>x2Emu, flipV = y1Emu>y2Emu;
+  const flipAttr = (flipH?' flipH="1"':'') + (flipV?' flipV="1"':'');
+  const lineEnds = doubleHeaded ? `<a:headEnd type="triangle"/><a:tailEnd type="triangle"/>` : `<a:tailEnd type="triangle" w="med" len="med"/>`;
+  return `<xdr:absoluteAnchor><xdr:pos x="${xEmu}" y="${yEmu}"/><xdr:ext cx="${cx}" cy="${cy}"/><xdr:cxnSp macro=""><xdr:nvCxnSpPr><xdr:cNvPr id="${id}" name="${dsXmlEsc(name)}"/><xdr:cNvCxnSpPr/></xdr:nvCxnSpPr><xdr:spPr><a:xfrm${flipAttr}><a:off x="${xEmu}" y="${yEmu}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="line"><a:avLst/></a:prstGeom><a:ln w="12700"><a:solidFill><a:srgbClr val="000000"/></a:solidFill>${lineEnds}</a:ln></xdr:spPr></xdr:cxnSp><xdr:clientData/></xdr:absoluteAnchor>`;
+}
+// Metin kutusu (çerçevesiz/dolgusuz) — VBA CizMetinKutusu karşılığı. Ok etiketleri de bunu kullanır.
+function dsOoxmlTextbox(id, name, xEmu, yEmu, cx, cy, text, opts){
+  opts = opts||{};
+  const align = opts.align||'l', bold = opts.bold?'1':'0', sz = opts.sz||900;
+  const paras = String(text).split('\n').map(line=>
+    `<a:p><a:pPr algn="${align}"/><a:r><a:rPr lang="tr-TR" sz="${sz}" b="${bold}"><a:solidFill><a:srgbClr val="000000"/></a:solidFill><a:latin typeface="Segoe UI"/></a:rPr><a:t>${dsXmlEsc(line)}</a:t></a:r></a:p>`
+  ).join('');
+  return `<xdr:absoluteAnchor><xdr:pos x="${xEmu}" y="${yEmu}"/><xdr:ext cx="${cx}" cy="${cy}"/><xdr:sp macro="" textlink=""><xdr:nvSpPr><xdr:cNvPr id="${id}" name="${dsXmlEsc(name)}"/><xdr:cNvSpPr txBox="1"/></xdr:nvSpPr><xdr:spPr><a:xfrm><a:off x="${xEmu}" y="${yEmu}"/><a:ext cx="${cx}" cy="${cy}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:noFill/><a:ln><a:noFill/></a:ln></xdr:spPr><xdr:txBody><a:bodyPr wrap="none" vertOverflow="clip" horzOverflow="clip" anchor="t"/><a:lstStyle/>${paras}</xdr:txBody></xdr:sp><xdr:clientData/></xdr:absoluteAnchor>`;
+}
+
+// Bir (şablon + girilen ölçüler) çiftinin, verilen satıra (0-indeksli) ankraj olacak
+// tüm şekillerinin XML'ini üretir. Şeklin geometrisi tpl'den birebir gelir, DEĞİŞMEZ —
+// olculer sadece etiket metni olarak eklenir. row'un mutlak Y'si (EMU) burada bir kere
+// hesaplanıp tüm alt şekillere eklenir (absoluteAnchor => col/row sınırı yok, X de dahil
+// sayfanın mutlak sol-üstüne göre).
+function dsBuildAnchorXML(tpl, delikSablonData, row, idStart, lineH){
+  let id = idStart, out = '';
+  const baseY = dsRowTopEmu(row);
+  const X = pt => dsEmu(pt);
+  const Y = pt => baseY + dsEmu(pt);
+  dsTemplatePanels(tpl).forEach(p=>{
+    const olculer = tpl.multiPanel
+      ? (((delikSablonData.paneller||{})[p.key]||{}).olculer || {})
+      : (delikSablonData.olculer || {});
+    out += dsOoxmlShape(id++, 'Cam', X(p.glass.x), Y(p.glass.y), dsEmu(p.glass.w), dsEmu(p.glass.h), 'rect', 'F5F7FA', '000000', 19050);
+    p.holes.forEach((h,i)=>{ out += dsOoxmlShape(id++, 'Delik '+(i+1), X(h.x), Y(h.y), dsEmu(h.w), dsEmu(h.h), 'ellipse', 'FFFFFF', '000000', 12700); });
+    p.arrows.forEach(a=>{
+      if(a.type==='single'){
+        out += dsOoxmlConnector(id++, 'Ok', X(a.x1), Y(a.y1), X(a.x2), Y(a.y2), false);
+      } else {
+        out += dsOoxmlConnector(id++, 'Cift Ok', X(a.x), Y(a.y1), X(a.x), Y(a.y2), true);
+      }
+      const v = olculer[a.id];
+      if(v!=null && v!==''){
+        const lbl = dsAutoLabel(a);
+        out += dsOoxmlTextbox(id++, 'Olcu '+a.id, X(lbl.x-22), Y(lbl.y-7), dsEmu(44), dsEmu(15), v+' cm', {sz:850, bold:true, align:'ctr'});
+      }
+    });
+    // "BURAYA CAM ÖLÇÜSÜ" — kural 5.1: kullanıcı girişi değil, satırın kendi Boy (h) alanı.
+    if(p.camOlcuArrow){
+      const a = p.camOlcuArrow;
+      out += dsOoxmlConnector(id++, 'Ok', X(a.x1), Y(a.y1), X(a.x2), Y(a.y2), false);
+      if(lineH){
+        const lbl = dsAutoLabel({type:'single', x1:a.x1, y1:a.y1, x2:a.x2, y2:a.y2});
+        out += dsOoxmlTextbox(id++, 'Cam Olcusu', X(lbl.x-30), Y(lbl.y-7), dsEmu(70), dsEmu(15), lineH+' mm', {sz:850, bold:true, align:'ctr'});
+      }
+    }
+    if(p.note) out += dsOoxmlTextbox(id++, 'Not', X(p.noteX), Y(p.noteY), dsEmu(220), dsEmu(34), p.note, {sz:900});
+  });
+  return {xml: out, nextId: id};
+}
+
+// wb.xlsx.writeBuffer() ile üretilmiş ham buffer'ı JSZip ile açıp, sayfanın
+// drawing XML'ine delikSablon şekillerini ekleyip yeniden paketler.
+async function injectDelikSablonShapes(buf, anchors){
+  if(!anchors || !anchors.length) return buf;
+  const zip = await JSZip.loadAsync(buf);
+  const relsFile = zip.file('xl/worksheets/_rels/sheet1.xml.rels');
+  if(!relsFile){ console.warn('[delikSablon] sheet1.xml.rels bulunamadı, şekiller eklenemedi.'); return buf; }
+  const relsXml = await relsFile.async('string');
+  const relMatch = relsXml.match(/<Relationship[^>]*Type="[^"]*\/drawing"[^>]*Target="([^"]+)"[^>]*\/>/)
+                 || relsXml.match(/<Relationship[^>]*Target="([^"]+)"[^>]*Type="[^"]*\/drawing"[^>]*\/>/);
+  if(!relMatch){ console.warn('[delikSablon] drawing ilişkisi bulunamadı, şekiller eklenemedi.'); return buf; }
+  const drawingPath = 'xl/drawings/' + relMatch[1].split('/').pop();
+  const drawingFile = zip.file(drawingPath);
+  if(!drawingFile){ console.warn('[delikSablon] drawing dosyası bulunamadı: '+drawingPath); return buf; }
+  let drawingXml = await drawingFile.async('string');
+
+  let maxId = 0;
+  (drawingXml.match(/id="(\d+)"/g)||[]).forEach(s=>{ const n=parseInt(s.match(/\d+/)[0]); if(n>maxId) maxId=n; });
+  let nextId = maxId + 1;
+
+  let injectXml = '';
+  anchors.forEach(a=>{
+    const tpl = DELIK_SABLON_TANIMLARI[a.delikSablon && a.delikSablon.sablon];
+    if(!tpl) return;
+    const built = dsBuildAnchorXML(tpl, a.delikSablon, a.row, nextId, a.h);
+    injectXml += built.xml;
+    nextId = built.nextId;
+  });
+  if(!injectXml) return buf;
+
+  drawingXml = drawingXml.replace('</xdr:wsDr>', injectXml + '</xdr:wsDr>');
+  zip.file(drawingPath, drawingXml);
+  return await zip.generateAsync({type:'arraybuffer'});
+}
 
 // Excel'e gömülecek delik/menfez diyagramını bir <canvas>'a çizip PNG base64 döndürür.
 // Şablonla birebir aynı mantık: dikdörtgen (cam) + delik (daire) + üstten/soldan
@@ -3253,7 +3720,7 @@ function parseCamAdi(label){
 // Bir siparişin tam form bloğunu (başlık+firma+müşteri+tablo+toplam+delik) verilen
 // satırdan (base+1) başlayarak çizer. Hem tekli export hem toplu export bunu kullanır.
 // base=0 → blok 1. satırdan başlar (eskisiyle birebir aynı). Dönen değer: bloğun kullandığı son satır.
-function drawOrderExcelBlock(wb, ws, o, base){
+function drawOrderExcelBlock(wb, ws, o, base, delikSablonAnchors){
   const R = (n)=> base + n; // blok-içi göreli satırı, sayfadaki gerçek satıra çevirir
   const wsName = profile.workshop_name || profile.full_name || 'Atölye';
   const lines = o.lines || [];
@@ -3374,8 +3841,9 @@ function drawOrderExcelBlock(wb, ws, o, base){
 
   // Delik Bölümü — sadece kroki eklenmiş satırlar için, tablonun altına ayrı bir bölüm olarak (sadece şema, ekstra ölçü yazısı yok)
   const dmLines = lines.filter(l=>l.dm && l.dm.length);
+  const delikSablonLines = lines.filter(l=>l.delikSablon && l.delikSablon.sablon);
   let lastUsedRow = totalRow;
-  if(dmLines.length){
+  if(dmLines.length || delikSablonLines.length){
     let r = totalRow + 2;
     ws.mergeCells(`A${r}:I${r}`);
     styleCell(ws.getCell(`A${r}`), {font:FONT_HDR, fill:GRAY_FILL, align:{h:'center'}});
@@ -3386,6 +3854,13 @@ function drawOrderExcelBlock(wb, ws, o, base){
       const imgId = wb.addImage({base64:b64, extension:'png'});
       ws.addImage(imgId, {tl:{col:0, row:r-1}, ext:{width:220, height:220}});
       r += 12;
+    });
+    // Yeni şablon sistemi: gerçek Excel Shape'leri writeBuffer() SONRASINDA enjekte
+    // edilecek (ExcelJS shape çizmiyor) — burada sadece hangi satıra (0-indeksli
+    // row) ankraj olacağını kaydediyoruz, delikSablonAnchors dizisine ekliyoruz.
+    delikSablonLines.forEach(l=>{
+      if(delikSablonAnchors) delikSablonAnchors.push({delikSablon: l.delikSablon, row: r-1, h: l.h});
+      r += 26;
     });
     lastUsedRow = r - 1;
   }
@@ -3430,7 +3905,9 @@ function estimateBlockRows(o){
   const lines = o.lines || [];
   const totalRow = 13 + Math.max(lines.length,1); // drawOrderExcelBlock'taki totalRow ile birebir aynı formül (base=0)
   const dmLines = lines.filter(l=>l.dm && l.dm.length);
-  return dmLines.length ? (totalRow + 2 + dmLines.length*12) : totalRow;
+  const delikSablonLines = lines.filter(l=>l.delikSablon && l.delikSablon.sablon);
+  if(!dmLines.length && !delikSablonLines.length) return totalRow;
+  return totalRow + 2 + dmLines.length*12 + delikSablonLines.length*26;
 }
 
 // Bir A4 sayfasına (mevcut kenar boşluğu + varsayılan 15pt satır yüksekliğiyle) sığan
@@ -3442,7 +3919,7 @@ const EXCEL_ROWS_PER_A4_PAGE = 46;
 // Birden fazla sipariş bloğunu (aynı sipariş tekrar tekrar ya da farklı siparişler)
 // alt alta yerleştirir. Bir sonraki blok mevcut sayfaya SIĞMAYACAKSA, o bloğu
 // ortadan kesmek yerine tamamen bir sonraki A4 sayfasına atar (manuel sayfa kesimi).
-function layoutOrderBlocks(wb, ws, orderList){
+function layoutOrderBlocks(wb, ws, orderList, delikSablonAnchors){
   let cursor = 0;       // o ana kadar kullanılan son satır (mutlak)
   let pageUsed = 0;     // mevcut "sanal" A4 sayfasında kullanılan satır sayısı
   const GAP = 2;         // bloklar arası boşluk satırı
@@ -3460,7 +3937,7 @@ function layoutOrderBlocks(wb, ws, orderList){
       }
     }
     const startBase = cursor;
-    const endRow = drawOrderExcelBlock(wb, ws, o, startBase);
+    const endRow = drawOrderExcelBlock(wb, ws, o, startBase, delikSablonAnchors);
     pageUsed += (endRow - startBase);
     cursor = endRow;
     lastUsedRow = endRow;
@@ -3488,7 +3965,8 @@ async function exportOrderToExcelGenel(o, copies){
   // aynı siparişin formu, istenen kopya sayısı kadar alt alta tekrar basılır —
   // bir kopya sayfa ortasında bölünecekse otomatik yeni sayfaya atılır.
   const orderList = Array.from({length: copies}, ()=>o);
-  const lastUsedRow = layoutOrderBlocks(wb, ws, orderList);
+  const delikSablonAnchors = []; // {delikSablon, row} — writeBuffer() sonrası gerçek Shape enjeksiyonu için
+  const lastUsedRow = layoutOrderBlocks(wb, ws, orderList, delikSablonAnchors);
   // Yazdırma alanı içeriğin bittiği satırdan biraz daha aşağıya kadar (+25 satır) açık
   // bırakılıyor — dosya indirildikten sonra Excel'de elle not/şekil/çizim eklenirse
   // (örn. şekilli camın taslağı) o da yazdırma alanına girsin diye.
@@ -3500,7 +3978,7 @@ async function exportOrderToExcelGenel(o, copies){
   // Bayi ve müşteri aynıysa (bayi adı girilmemiş, ikisi de müşteri adına düşmüşse) ismi tekrar etme.
   const isimKismi = bayiAdi === musteriAdi ? bayiAdi : `${bayiAdi} ${musteriAdi}`;
   const kopyaEk = copies>1 ? ` ${copies} kopya` : '';
-  await downloadWorkbook(wb, `${isimKismi} ${tarihAdi}${kopyaEk}.xlsx`);
+  await downloadWorkbook(wb, `${isimKismi} ${tarihAdi}${kopyaEk}.xlsx`, delikSablonAnchors);
 }
 
 // "Excel'e aktar" butonuna basınca kaç kopya (fabrikadaki kaç bölüme) basılacağını sorar.
@@ -3512,8 +3990,11 @@ function askExcelCopiesAndExport(o){
   exportOrderToExcelGenel(o, copies);
 }
 
-async function downloadWorkbook(wb, filename){
-  const buf = await wb.xlsx.writeBuffer();
+async function downloadWorkbook(wb, filename, delikSablonAnchors){
+  let buf = await wb.xlsx.writeBuffer();
+  if(delikSablonAnchors && delikSablonAnchors.length){
+    buf = await injectDelikSablonShapes(buf, delikSablonAnchors);
+  }
   const blob = new Blob([buf], {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
   // Destekleyen tarayıcılarda (Chrome/Edge) "Farklı Kaydet" penceresi açılıp
   // kullanıcı istediği klasörü seçebiliyor; desteklemeyen tarayıcılarda (Firefox/Safari)
