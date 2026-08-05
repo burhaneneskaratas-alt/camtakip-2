@@ -76,7 +76,7 @@
   .hint{font-size:12px; color:var(--text-dim);}
   .err{font-size:12px; color:var(--danger);}
   .lines-wrap{border:1px solid var(--border); border-radius:var(--radius-sm); padding:14px; margin-bottom:12px; background:var(--surface-2);}
-  .line-row{display:grid; grid-template-columns:0.8fr 0.8fr 55px 1.1fr 40px 85px 120px 34px 30px; gap:8px; align-items:center; margin-bottom:8px;}
+  .line-row{display:grid; grid-template-columns:0.8fr 0.8fr 55px 1.1fr 40px 85px 120px 30px; gap:8px; align-items:center; margin-bottom:8px;}
   .line-sekilli{display:flex; align-items:center; gap:2px; font-size:10px; color:var(--text-dim); cursor:pointer; white-space:nowrap;}
   .line-sekilli input{width:14px; height:14px; margin:0;}
   .line-sekil-foto{display:flex; align-items:center; gap:8px; margin:-4px 0 10px 0; padding-left:4px;}
@@ -89,7 +89,7 @@
   .line-dm{background:transparent; border:1px solid var(--border); color:var(--text-dim); cursor:pointer; font-size:13px; padding:4px 6px; border-radius:var(--radius-sm); white-space:nowrap;}
   .line-dm.has-data{color:var(--accent); border-color:var(--accent);}
   .line-dm:hover{color:var(--accent); border-color:var(--accent);}
-  .line-labels{display:grid; grid-template-columns:0.8fr 0.8fr 55px 1.1fr 40px 85px 120px 34px 30px; gap:8px; margin-bottom:6px;}
+  .line-labels{display:grid; grid-template-columns:0.8fr 0.8fr 55px 1.1fr 40px 85px 120px 30px; gap:8px; margin-bottom:6px;}
   .line-labels span{font-size:10.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:0.04em; font-weight:700;}
   .lines-total{display:flex; justify-content:space-between; align-items:center; margin-top:10px; padding-top:10px; border-top:1px solid var(--border);}
   .lines-total-val{font-family:var(--font-display); font-size:18px; font-weight:800; color:var(--accent);}
@@ -208,57 +208,7 @@
   </div>
 </div>
 
-<!-- ====== Delik / Menfez kroki editörü ====== -->
-<div id="dm_overlay" style="display:none; position:fixed; inset:0; z-index:9999; background:rgba(15,18,28,0.55); align-items:center; justify-content:center; padding:20px;">
-  <div style="background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); width:100%; max-width:380px; max-height:92vh; overflow-y:auto; padding:20px;">
-    <div style="font-family:var(--font-display); font-weight:700; font-size:15px; margin-bottom:10px;">📐 Delikli / Menfezli ölçü ekle</div>
-
-    <div class="field-grid three" style="margin-bottom:10px;">
-      <div class="field"><label>En (mm)</label><input id="dm_w" type="number" placeholder="1200"></div>
-      <div class="field"><label>Boy (mm)</label><input id="dm_h" type="number" placeholder="800"></div>
-      <div class="field"><label>Adet</label><input id="dm_qty" type="number" value="1"></div>
-    </div>
-
-    <div class="field" style="margin-bottom:12px;">
-      <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;" id="sb_toggle">
-        <label style="margin:0;">🗂️ Hazır Şablonlar (teknik çizim)</label>
-        <span class="hint" id="sb_toggleArrow">▾</span>
-      </div>
-      <div id="sb_gallery" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;"></div>
-    </div>
-
-    <div class="hint" style="display:block; margin-bottom:6px; text-align:center;">Önizleme (mevcut bir deliğe tıklayıp menfez yönü/silme seçebilirsin):</div>
-    <div style="display:flex; justify-content:center; margin-bottom:10px;">
-      <canvas id="dm_canvas" width="220" height="280" style="background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); max-width:100%;"></canvas>
-    </div>
-
-    <div class="hint" style="display:block; margin-bottom:6px;">Mesafeyi hangi kenardan ölçtün?</div>
-    <div class="field-grid two" style="margin-bottom:8px;">
-      <button type="button" class="btn btn-ghost btn-sm dm-side-btn active" data-side="sol" style="width:100%;">← Soldan</button>
-      <button type="button" class="btn btn-ghost btn-sm dm-side-btn" data-side="sag" style="width:100%;">Sağdan →</button>
-    </div>
-    <div class="field-grid two" style="margin-bottom:8px;">
-      <div class="field"><label>Üstten (mm)</label><input id="dm_ust" type="number" placeholder="120"></div>
-      <div class="field"><label id="dm_yatayLabel">Soldan (mm)</label><input id="dm_yatay" type="number" placeholder="80"></div>
-    </div>
-    <button class="btn btn-ghost btn-sm" id="dm_addDelik" style="margin-bottom:12px;">+ Delik ekle</button>
-
-    <div id="dm_dirRow" style="display:none; justify-content:center; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
-      <span class="hint" style="width:100%; text-align:center;">Seçili delikten menfez çıkan kenar(lar):</span>
-      <button class="btn btn-ghost btn-sm" data-dir="up">↑ Üst</button>
-      <button class="btn btn-ghost btn-sm" data-dir="down">↓ Alt</button>
-      <button class="btn btn-ghost btn-sm" data-dir="left">← Sol</button>
-      <button class="btn btn-ghost btn-sm" data-dir="right">→ Sağ</button>
-    </div>
-    <div id="dm_list" style="margin-bottom:10px;"></div>
-    <div class="field" style="margin-bottom:12px;"><label>Not (opsiyonel)</label><input id="dm_note" type="text" placeholder="Örn: menfez üstten çıkar"></div>
-    <div class="form-actions">
-      <button class="btn btn-primary btn-sm" id="dm_save">Listeye ekle</button>
-      <button class="btn btn-ghost btn-sm" id="dm_clear">Delikleri temizle</button>
-      <button class="btn btn-ghost btn-sm" id="dm_cancel">İptal</button>
-    </div>
-  </div>
-</div>
+<!-- Delik/Menfez kroki editörü kaldırıldı — sadece "Delik/Poz" not alanı kullanılıyor artık. -->
 
 <script>
 const SETUP_MISSING = SUPABASE_URL.includes('BURAYA') || SUPABASE_ANON_KEY.includes('BURAYA');
@@ -975,12 +925,11 @@ function renderWorkshop(){
       </div>
       <div class="field" style="margin-bottom:6px;"><label>Ölçüler</label></div>
       <div class="lines-wrap">
-        <div class="line-labels"><span>En (mm)</span><span>Boy (mm)</span><span>Adet</span><span>Delik/Poz</span><span></span><span>m²</span><span>Isıcam</span><span></span><span></span></div>
+        <div class="line-labels"><span>En (mm)</span><span>Boy (mm)</span><span>Adet</span><span>Delik/Poz</span><span></span><span>m²</span><span>Isıcam</span><span></span></div>
         <div id="w_lines"></div>
         <button class="btn btn-ghost btn-sm" id="w_addLine" style="margin-top:6px;">+ Ölçü ekle</button>
         <button class="btn btn-ghost btn-sm" id="w_mrBtn" style="margin-top:6px;">📷 Fotoğraftan ölçü oku</button>
         <button class="btn btn-ghost btn-sm" id="w_xlBtn" type="button" style="margin-top:6px;">📊 Excel'den sipariş oku</button>
-        <button class="btn btn-ghost btn-sm" id="w_dmNewBtn" style="margin-top:6px;">📐 Delikli ölçü ekle</button>
         <div class="lines-total"><span class="hint">Toplam m²</span><span class="lines-total-val" id="w_totalM2">0,00 m²</span></div>
       </div>
       <div class="field"><label for="w_note">Not</label><input id="w_note" type="text" placeholder="Örn: 2 delik, çentikli kesim"></div>
@@ -1062,7 +1011,6 @@ function renderWorkshop(){
   document.getElementById('w_addLine').onclick = addLine;
   document.getElementById('w_mrBtn').onclick = ()=> openMeasureReader('lines','w');
   document.getElementById('w_xlBtn').onclick = ()=> openExcelImport('w');
-  document.getElementById('w_dmNewBtn').onclick = ()=> openDelikEditor(null);
   document.getElementById('w_submit').onclick = submitWorkshopOrder;
   document.getElementById('w_cancelEdit').onclick = ()=> cancelEdit('w');
   // Isıcam checkbox handler'ları (satıcı)
@@ -2031,12 +1979,11 @@ function renderCustomer(){
       </div>
       <div class="field" style="margin-bottom:6px;"><label>Ölçüler</label></div>
       <div class="lines-wrap">
-        <div class="line-labels"><span>En (mm)</span><span>Boy (mm)</span><span>Adet</span><span>Delik/Poz</span><span></span><span>m²</span><span>Isıcam</span><span></span><span></span></div>
+        <div class="line-labels"><span>En (mm)</span><span>Boy (mm)</span><span>Adet</span><span>Delik/Poz</span><span></span><span>m²</span><span>Isıcam</span><span></span></div>
         <div id="c_lines"></div>
         <button class="btn btn-ghost btn-sm" id="c_addLine" style="margin-top:6px;">+ Ölçü ekle</button>
         <button class="btn btn-ghost btn-sm" id="c_mrBtn" style="margin-top:6px;">📷 Fotoğraftan ölçü oku</button>
         <button class="btn btn-ghost btn-sm" id="c_xlBtn" type="button" style="margin-top:6px;">📊 Excel'den sipariş oku</button>
-        <button class="btn btn-ghost btn-sm" id="c_dmNewBtn" style="margin-top:6px;">📐 Delikli ölçü ekle</button>
         <div class="lines-total"><span class="hint">Toplam m²</span><span class="lines-total-val" id="c_totalM2">0,00 m²</span></div>
       </div>
       <div class="field"><label for="c_note">Not (delik, çentik, özel şekil vb.)</label><textarea id="c_note" placeholder="Örn: sağ üst köşede 2 delik"></textarea></div>
@@ -2072,7 +2019,6 @@ function renderCustomer(){
   document.getElementById('c_addLine').onclick = addLine;
   document.getElementById('c_mrBtn').onclick = ()=> openMeasureReader('lines','c');
   document.getElementById('c_xlBtn').onclick = ()=> openExcelImport('c');
-  document.getElementById('c_dmNewBtn').onclick = ()=> openDelikEditor(null);
   document.getElementById('c_submit').onclick = submitCustomerOrder;
   document.getElementById('c_cancelEdit').onclick = ()=> cancelEdit('c');
   // Isıcam checkbox handler'ları (müşteri)
@@ -2306,7 +2252,6 @@ function renderLines(){
       </label>
       <span class="line-m2">${fmtM2(lineM2(l))}</span>
       ${isicamEnabled ? `<span class="line-isicam-compact" data-idx="${i}" style="font-size:11px;color:var(--text-mut);cursor:pointer;padding:4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);white-space:nowrap;display:inline-block;user-select:none;" title="Tıkla: Bu satırın Isıcam'ını düzenle">${(l.isicam?.dis||4)}+${(l.isicam?.bosluk||12)}+${(l.isicam?.ic||4)} ${(l.isicam?.renk||'—')}</span>` : `<span></span>`}
-      <button class="line-dm ${(l.dm&&l.dm.length)?'has-data':''}" data-idx="${i}" title="Delik/Menfez ekle">📐${(l.dm&&l.dm.length)?' '+l.dm.length:''}</button>
       <button class="line-del" data-idx="${i}" title="Satırı sil">×</button>
     </div>
     ${l.sekilli ? `
@@ -2418,9 +2363,6 @@ function renderLines(){
   });
   el.querySelectorAll('.line-del').forEach(btn=>{
     btn.onclick = ()=> removeLine(parseInt(btn.dataset.idx));
-  });
-  el.querySelectorAll('.line-dm').forEach(btn=>{
-    btn.onclick = ()=> openDelikEditor(parseInt(btn.dataset.idx));
   });
   el.querySelectorAll('.line-isicam-compact').forEach(span=>{
     span.onclick = ()=> openIsicamLineEditor(parseInt(span.dataset.idx));
@@ -2697,7 +2639,7 @@ function renderLinesResult(previewImg, data){
       <div class="field"><label style="font-size:11px;">Boy (mm)</label><input id="mr_boy_${i}" type="number" value="${o.boy_mm||''}"></div>
       <div class="field"><label style="font-size:11px;">Adet</label><input id="mr_adet_${i}" type="number" value="${o.adet||1}"></div>
     </div>
-    ${delikSayisi ? `<div class="hint" style="display:block;margin-bottom:6px;color:var(--accent);">📐 Bu satırda ${delikSayisi} delik/menfez tespit edildi — eklendikten sonra 📐 butonundan kontrol edebilirsin.</div>` : ''}`;
+    ${delikSayisi ? `<div class="hint" style="display:block;margin-bottom:6px;color:var(--accent);">📐 Bu satırda ${delikSayisi} delik/menfez tespit edildi — "Delik/Poz" kutusuna not olarak eklenecek.</div>` : ''}`;
   }).join('');
   body.innerHTML = previewImg + `
     ${data.musteri_adi ? `<div class="field" style="margin-bottom:8px;"><label style="font-size:11px;">Okunan müşteri adı — düzeltip onaylayabilirsin</label><input id="mr_musteri" type="text" value="${data.musteri_adi}"></div>` : ''}
@@ -2727,7 +2669,7 @@ function renderLinesResult(previewImg, data){
       if(!en || !boy) return;
       // Delik/menfez ölçüsünü (üstten/soldan mm) fotoğraftan otomatik hesaplamıyoruz —
       // bu, hataya çok açık bir tahmin olurdu. Bunun yerine sadece "kaç tane, ne tür"
-      // olduğunu NOT olarak düşüyoruz; kesin ölçüyü kullanıcı 📐 butonundan kendi elle girer.
+      // olduğunu NOT olarak düşüyoruz; kesin ölçüyü kullanıcı "Delik/Poz" kutusuna kendi yazar.
       const delikler = Array.isArray(o.delikler) ? o.delikler : [];
       let otoNot = '';
       if(delikler.length){
@@ -2782,387 +2724,7 @@ function renderDusakabinResult(previewImg, data){
   };
 }
 
-// ====================================================================
-// DELİK / MENFEZ KROKİ EDİTÖRÜ
-// ====================================================================
-let dmCtx = null; // {lineIdx: idx|null, dm:[{x,y,ust,yatay,side,dirs:[]}], selected:idx|null}
-let dmSide = 'sol'; // o an seçili yatay referans: 'sol' ya da 'sag'
-
-// ====================================================================
-// İSİCAM SATIRı DÜZEN modali
-// ====================================================================
-function openDelikEditor(lineIdx){
-  const l = (lineIdx!==null && lineIdx!==undefined) ? lineState[lineIdx] : null;
-  dmCtx = {
-    lineIdx: (lineIdx!==undefined ? lineIdx : null),
-    dm: (l && l.dm ? l.dm.map(p=>({x:p.x, y:p.y, ust:p.ust, yatay:(p.yatay!=null?p.yatay:p.sol), side:(p.side||'sol'), dirs:(p.dirs||[]).slice()})) : []),
-    selected: null
-  };
-  document.getElementById('dm_w').value = l ? l.w : '';
-  document.getElementById('dm_h').value = l ? l.h : '';
-  document.getElementById('dm_qty').value = l ? (l.qty||1) : 1;
-  document.getElementById('dm_note').value = l ? (l.note||'') : '';
-  document.getElementById('dm_ust').value = '';
-  document.getElementById('dm_yatay').value = '';
-  dmSetSide('sol');
-  document.getElementById('dm_overlay').style.display = 'flex';
-  document.getElementById('dm_dirRow').style.display = 'none';
-  drawDmCanvas();
-  renderDmList();
-}
-
-function dmSetSide(side){
-  dmSide = side;
-  document.querySelectorAll('.dm-side-btn').forEach(b=>{
-    b.classList.toggle('active', b.dataset.side===side);
-  });
-  document.getElementById('dm_yatayLabel').textContent = side==='sag' ? 'Sağdan (mm)' : 'Soldan (mm)';
-}
-document.querySelectorAll('.dm-side-btn').forEach(b=>{
-  b.onclick = ()=> dmSetSide(b.dataset.side);
-});
-
-function dmRectBounds(){
-  const canvas = document.getElementById('dm_canvas');
-  const pad = 20;
-  const availW = canvas.width - pad*2, availH = canvas.height - pad*2;
-  const w = parseFloat(document.getElementById('dm_w').value) || 1000;
-  const h = parseFloat(document.getElementById('dm_h').value) || 1000;
-  const ratio = w / h;
-  let rw, rh;
-  if(ratio > availW/availH){ rw = availW; rh = availW/ratio; }
-  else { rh = availH; rw = availH*ratio; }
-  const x0 = (canvas.width - rw)/2, y0 = (canvas.height - rh)/2;
-  return {x0, y0, x1: x0+rw, y1: y0+rh};
-}
-
-function drawDmCanvas(){
-  const canvas = document.getElementById('dm_canvas');
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0,0,canvas.width,canvas.height);
-  const b = dmRectBounds();
-  const rw = b.x1-b.x0, rh = b.y1-b.y0;
-  ctx.strokeStyle = '#8a93a6'; ctx.lineWidth = 2;
-  ctx.strokeRect(b.x0, b.y0, rw, rh);
-
-  dmCtx.dm.forEach((p, i)=>{
-    const px = b.x0 + p.x*rw, py = b.y0 + p.y*rh;
-    (p.dirs||[]).forEach(dir=>{
-      ctx.strokeStyle = '#2563eb'; ctx.lineWidth = 2;
-      let tx=px, ty=py;
-      if(dir==='up') ty = b.y0 - 14;
-      if(dir==='down') ty = b.y1 + 14;
-      if(dir==='left') tx = b.x0 - 14;
-      if(dir==='right') tx = b.x1 + 14;
-      ctx.beginPath(); ctx.moveTo(px,py); ctx.lineTo(tx,ty); ctx.stroke();
-      const ang = Math.atan2(ty-py, tx-px);
-      ctx.beginPath();
-      ctx.moveTo(tx,ty);
-      ctx.lineTo(tx-8*Math.cos(ang-0.4), ty-8*Math.sin(ang-0.4));
-      ctx.lineTo(tx-8*Math.cos(ang+0.4), ty-8*Math.sin(ang+0.4));
-      ctx.closePath(); ctx.fillStyle = '#2563eb'; ctx.fill();
-    });
-    ctx.beginPath(); ctx.arc(px, py, 9, 0, Math.PI*2);
-    ctx.fillStyle = i===dmCtx.selected ? 'rgba(37,99,235,0.25)' : 'rgba(138,147,166,0.2)';
-    ctx.fill();
-    ctx.strokeStyle = i===dmCtx.selected ? '#2563eb' : '#8a93a6'; ctx.lineWidth = 2; ctx.stroke();
-  });
-}
-
-// Canvas artık sadece önizleme + mevcut bir deliği seçmek için (menfez yönü işaretlemek ya da silmek üzere).
-// Yeni delik eklemek her zaman aşağıdaki mm alanlarıyla, elle girilerek yapılır.
-document.getElementById('dm_canvas').addEventListener('click', function(e){
-  const rect = this.getBoundingClientRect();
-  const scaleX = this.width / rect.width, scaleY = this.height / rect.height;
-  const cx = (e.clientX - rect.left)*scaleX, cy = (e.clientY - rect.top)*scaleY;
-  const b = dmRectBounds();
-  const rw = b.x1-b.x0, rh = b.y1-b.y0;
-  let hitIdx = -1;
-  dmCtx.dm.forEach((p,i)=>{
-    const px = b.x0+p.x*rw, py = b.y0+p.y*rh;
-    if(Math.hypot(px-cx, py-cy) < 14) hitIdx = i;
-  });
-  dmCtx.selected = hitIdx>=0 ? hitIdx : null;
-  drawDmCanvas();
-  renderDmList();
-  document.getElementById('dm_dirRow').style.display = dmCtx.selected!==null ? 'flex' : 'none';
-  updateDmDirButtons();
-});
-
-document.getElementById('dm_addDelik').onclick = function(){
-  const w = parseFloat(document.getElementById('dm_w').value);
-  const h = parseFloat(document.getElementById('dm_h').value);
-  const ust = parseFloat(document.getElementById('dm_ust').value);
-  const yatay = parseFloat(document.getElementById('dm_yatay').value);
-  if(!w || !h){ alert('Önce En ve Boy değerlerini gir.'); return; }
-  if(isNaN(ust) || isNaN(yatay)){ alert('Üstten mesafeyi ve ' + (dmSide==='sag'?'sağdan':'soldan') + ' mesafeyi gir.'); return; }
-  const y = Math.min(Math.max(ust / h, 0), 1);
-  const x = dmSide==='sag' ? Math.min(Math.max(1 - (yatay/w), 0), 1) : Math.min(Math.max(yatay/w, 0), 1);
-  dmCtx.dm.push({x, y, ust, yatay, side: dmSide, dirs:[]});
-  dmCtx.selected = dmCtx.dm.length - 1;
-  document.getElementById('dm_ust').value = '';
-  document.getElementById('dm_yatay').value = '';
-  drawDmCanvas();
-  renderDmList();
-  document.getElementById('dm_dirRow').style.display = 'flex';
-  updateDmDirButtons();
-};
-
-// ====================================================================
-// ŞABLONLAR — Burhan'ın verdiği VBA kodlarının (Ciz_Aski_Ve_Cift_Kol_Delikli,
-// Ciz_2_Menteseli_Cam, Ciz_3_Menteseli_Cam, Ciz_Cift_Menteseli_Camlar,
-// Ciz_Isi_Cam_Ve_Delik, Ciz_Cift_Kol_Delikli_Cam) BİREBİR aynısı — hiçbir
-// ölçü burada yorumlanmadı/değiştirilmedi, sadece VBA'daki "sol üst köşe +
-// boyut" ovalleri buradaki "merkez noktası" (ust/yatay) formuna çevrildi.
-// Kaynak: Kuante_Cam_Sablon_Modulu.txt. w/h = kullanıcının girdiği En/Boy.
-// ====================================================================
-const SB_TEMPLATES = {
-  askikol: {
-    ad:'Askı + Çift Kol', ornek:{w:300,h:700},
-    build:(w,h)=>({
-      holes: [
-        {ust:22, yatay:22, side:'sol'}, {ust:22, yatay:22, side:'sag'},
-        {ust:h-22, yatay:22, side:'sol'}, {ust:h-22, yatay:22, side:'sag'},
-        {ust:97, yatay:32, side:'sag'}, {ust:157, yatay:32, side:'sag'}
-      ],
-      dims: [
-        {type:'v1', x:22, y1:0, y2:22, label:''},
-        {type:'v2', x:w-32, y1:97, y2:157, label:''}
-      ],
-      note:'askı ve çift kol delikli camlar için\nkol delikleri boydan merkez delinecek'
-    })
-  },
-  mentese2: {
-    ad:'2 Menteşeli', ornek:{w:300,h:900},
-    build:(w,h)=>({
-      holes: [
-        {ust:22, yatay:17, side:'sol'}, {ust:97, yatay:17, side:'sol'},
-        {ust:167, yatay:17, side:'sol'}, {ust:h-18, yatay:17, side:'sol'},
-        {ust:77, yatay:18, side:'sag'}, {ust:177, yatay:18, side:'sag'}
-      ],
-      dims: [
-        {type:'v1', x:17, y1:0, y2:22, label:''},
-        {type:'v2', x:w-18, y1:77, y2:177, label:''}
-      ],
-      note:'menteşe ve çift kol delikli camlar\nkol delikleri boydan merkez delinecek'
-    })
-  },
-  mentese3: {
-    ad:'3 Menteşeli', ornek:{w:300,h:1100},
-    build:(w,h)=>({
-      holes: [
-        {ust:22, yatay:17, side:'sol'}, {ust:72, yatay:17, side:'sol'},
-        {ust:127, yatay:17, side:'sol'}, {ust:182, yatay:17, side:'sol'},
-        {ust:242, yatay:17, side:'sol'}, {ust:297, yatay:17, side:'sol'},
-        {ust:127, yatay:18, side:'sag'}, {ust:202, yatay:18, side:'sag'}
-      ],
-      dims: [
-        {type:'v1', x:17, y1:0, y2:22, label:''},
-        {type:'v2', x:w-18, y1:127, y2:202, label:''}
-      ],
-      note:'3 menteşe + çift kol delikli camlar\nkol delikleri boydan merkez delinecek'
-    })
-  },
-  ciftmentese: {
-    ad:'Çift Menteşeli Camlar', ornek:{w:300,h:700},
-    build:(w,h)=>({
-      // VBA'da 2 ayrı cam (yan yana) çiziliyordu; buradaki tek dm_ editörü tek
-      // cam işlediği için "kollu" (2. cam) tarafı üretiliyor — eşi olan sade
-      // cam, aynı menteşe deliklerinin ayna-simetriği (kol'suz).
-      holes: [
-        {ust:22, yatay:17, side:'sol'}, {ust:82, yatay:17, side:'sol'},
-        {ust:132, yatay:17, side:'sol'}, {ust:h-18, yatay:17, side:'sol'},
-        {ust:87, yatay:13, side:'sag'}, {ust:137, yatay:13, side:'sag'}
-      ],
-      dims: [
-        {type:'v1', x:17, y1:0, y2:22, label:''},
-        {type:'v2', x:w-13, y1:87, y2:137, label:''}
-      ],
-      note:'MENTEŞE DELİKLİ CAMLAR İÇİN\nÇİFT kol delikleri boydan merkez delinecek\n(eşi: sade menteşeli panel, ayna simetrik)'
-    })
-  },
-  isicam: {
-    ad:'Isı Cam + Baca Deliği', ornek:{w:300,h:600},
-    build:(w,h)=>({
-      holes: [{ust:60, yatay:w/2, side:'sol'}],
-      dims: [],
-      note:'ısı cam + baca/menfez deliği',
-      holeRadius: 25
-    })
-  },
-  ciftkol: {
-    ad:'Çift Kol Delikli (sade)', ornek:{w:300,h:500},
-    build:(w,h)=>({
-      holes: [{ust:57, yatay:33, side:'sag'}, {ust:117, yatay:33, side:'sag'}],
-      dims: [{type:'v2', x:w-33, y1:57, y2:117, label:''}],
-      note:'çift kol delikli camlar için\nkol delikleri boydan merkez delinecek'
-    })
-  }
-};
-
-// --- SVG teknik çizim üretici (VBA'daki CizDelik/CizOk/CizCiftYonuOk/CizMetinKutusu karşılığı) ---
-function sbSvg(w, h, tpl){
-  const padL=90, padR=70, padT=40, padB= (tpl.note.split('\n').length*13)+40;
-  const vbW = w+padL+padR, vbH = h+padT+padB;
-  const X = x => x+padL, Y = y => y+padT;
-  let out = `<svg viewBox="0 0 ${vbW} ${vbH}" style="width:100%; height:auto; max-height:170px;">`;
-  out += `<defs><marker id="sbArr" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#333"/></marker></defs>`;
-  out += `<rect x="${X(0)}" y="${Y(0)}" width="${w}" height="${h}" fill="#f5f7fa" stroke="#111" stroke-width="2"/>`;
-  (tpl.holes||[]).forEach(p=>{
-    const x = p.side==='sag' ? w - p.yatay : p.yatay;
-    out += `<circle cx="${X(x)}" cy="${Y(p.ust)}" r="${tpl.holeRadius||7}" fill="#fff" stroke="#111" stroke-width="1.3"/>`;
-  });
-  (tpl.dims||[]).forEach(d=>{
-    if(d.type==='v1'){
-      const x=X(d.x);
-      out += `<line x1="${x}" y1="${Y(d.y1)}" x2="${x}" y2="${Y(d.y2)}" stroke="#333" stroke-width="1" marker-end="url(#sbArr)"/>`;
-      if(d.label) out += `<text x="${x-6}" y="${Y((d.y1+d.y2)/2)}" font-size="10" text-anchor="end" fill="#333">${d.label}</text>`;
-    } else if(d.type==='v2'){
-      const x=X(d.x);
-      out += `<line x1="${x}" y1="${Y(d.y1)}" x2="${x}" y2="${Y(d.y2)}" stroke="#333" stroke-width="1" marker-end="url(#sbArr)" marker-start="url(#sbArr)"/>`;
-      if(d.label) out += `<text x="${x+6}" y="${Y((d.y1+d.y2)/2)}" font-size="10" text-anchor="start" fill="#333">${d.label}</text>`;
-    } else if(d.type==='h1'){
-      const y=Y(d.y);
-      out += `<line x1="${X(d.x1)}" y1="${y}" x2="${X(d.x2)}" y2="${y}" stroke="#333" stroke-width="1" marker-end="url(#sbArr)"/>`;
-      if(d.label) out += `<text x="${X((d.x1+d.x2)/2)}" y="${y-6}" font-size="10" text-anchor="middle" fill="#333">${d.label}</text>`;
-    }
-  });
-  tpl.note.split('\n').forEach((line,i)=>{
-    out += `<text x="${X(w/2)}" y="${Y(h)+22+(i*13)}" font-size="10" font-weight="600" text-anchor="middle" fill="#111">${line}</text>`;
-  });
-  out += `</svg>`;
-  return out;
-}
-
-function sbApplyTemplate(key){
-  const w = parseFloat(document.getElementById('dm_w').value);
-  const h = parseFloat(document.getElementById('dm_h').value);
-  if(!w || !h){ alert('Önce En ve Boy değerlerini gir.'); return; }
-  const tpl = SB_TEMPLATES[key].build(w,h);
-  dmCtx.dm = tpl.holes.map(p=>({
-    x: p.side==='sag' ? Math.min(Math.max(1-(p.yatay/w),0),1) : Math.min(Math.max(p.yatay/w,0),1),
-    y: Math.min(Math.max(p.ust/h,0),1),
-    ust:p.ust, yatay:p.yatay, side:p.side, dirs:[]
-  }));
-  dmCtx.selected = null;
-  document.getElementById('dm_note').value = tpl.note.replace(/\n/g,' — ');
-  drawDmCanvas();
-  renderDmList();
-  document.getElementById('dm_dirRow').style.display = 'none';
-}
-
-function renderSbGallery(){
-  const gallery = document.getElementById('sb_gallery');
-  gallery.innerHTML = Object.keys(SB_TEMPLATES).map(key=>{
-    const t = SB_TEMPLATES[key];
-    const preview = sbSvg(t.ornek.w, t.ornek.h, t.build(t.ornek.w, t.ornek.h));
-    return `<div class="sb-card" data-key="${key}" style="border:1px solid var(--border); border-radius:var(--radius-sm); padding:6px; cursor:pointer; background:var(--surface-2); text-align:center;">
-      ${preview}
-      <div style="font-size:11px; font-weight:600; margin-top:4px;">${t.ad}</div>
-    </div>`;
-  }).join('');
-  gallery.querySelectorAll('.sb-card').forEach(card=>{
-    card.onclick = ()=> sbApplyTemplate(card.dataset.key);
-  });
-}
-renderSbGallery();
-
-let sbGalleryOpen = true;
-document.getElementById('sb_toggle').onclick = function(){
-  sbGalleryOpen = !sbGalleryOpen;
-  document.getElementById('sb_gallery').style.display = sbGalleryOpen ? 'grid' : 'none';
-  document.getElementById('sb_toggleArrow').textContent = sbGalleryOpen ? '▾' : '▸';
-};
-
-function updateDmDirButtons(){
-  const row = document.getElementById('dm_dirRow');
-  const dirs = dmCtx.selected!==null ? (dmCtx.dm[dmCtx.selected].dirs||[]) : [];
-  row.querySelectorAll('button').forEach(btn=>{
-    const active = dirs.includes(btn.dataset.dir);
-    btn.style.borderColor = active ? 'var(--accent)' : '';
-    btn.style.color = active ? 'var(--accent)' : '';
-  });
-}
-
-document.getElementById('dm_dirRow').querySelectorAll('button[data-dir]').forEach(btn=>{
-  btn.onclick = function(){
-    if(dmCtx.selected===null) return;
-    const p = dmCtx.dm[dmCtx.selected];
-    p.dirs = p.dirs || [];
-    const dir = this.dataset.dir;
-    const idx = p.dirs.indexOf(dir);
-    if(idx>=0) p.dirs.splice(idx,1); else p.dirs.push(dir);
-    drawDmCanvas();
-    renderDmList();
-    updateDmDirButtons();
-  };
-});
-
-const DM_DIR_LABEL = {up:'Üst', down:'Alt', left:'Sol', right:'Sağ'};
-function renderDmList(){
-  const list = document.getElementById('dm_list');
-  if(dmCtx.dm.length===0){ list.innerHTML = `<div class="hint">Henüz delik eklenmedi.</div>`; return; }
-  const w = parseFloat(document.getElementById('dm_w').value) || 0;
-  const h = parseFloat(document.getElementById('dm_h').value) || 0;
-  list.innerHTML = dmCtx.dm.map((p,i)=>{
-    const yatayMm = (p.yatay!=null && !isNaN(p.yatay)) ? Math.round(p.yatay) : (w ? Math.round((p.side==='sag' ? (1-p.x)*w : p.x*w)) : null);
-    const ustenMm = (p.ust!=null && !isNaN(p.ust)) ? Math.round(p.ust) : (h ? Math.round(p.y*h) : null);
-    const yatayEtiket = p.side==='sag' ? 'Sağdan' : 'Soldan';
-    const olcuText = (yatayMm!==null && ustenMm!==null) ? `Üstten ${ustenMm}mm · ${yatayEtiket} ${yatayMm}mm` : 'Ölçü bilinmiyor';
-    return `
-    <div data-i="${i}" class="dm-item" style="display:flex; align-items:center; justify-content:space-between; padding:6px 8px; border-radius:var(--radius-sm); background:${i===dmCtx.selected?'var(--accent-soft)':'transparent'}; margin-bottom:4px; font-size:12.5px; cursor:pointer;">
-      <span>Delik ${i+1} — ${olcuText}${p.dirs&&p.dirs.length ? ' — Menfez: '+p.dirs.map(d=>DM_DIR_LABEL[d]).join(', ') : ' — menfez yok'}</span>
-      <button class="line-del" data-i="${i}" style="font-size:14px;">×</button>
-    </div>`;
-  }).join('');
-  list.querySelectorAll('.dm-item').forEach(row=>{
-    row.onclick = (e)=>{
-      if(e.target.closest('button')) return;
-      dmCtx.selected = parseInt(row.dataset.i);
-      drawDmCanvas(); renderDmList();
-      document.getElementById('dm_dirRow').style.display = 'flex';
-      updateDmDirButtons();
-    };
-  });
-  list.querySelectorAll('button').forEach(btn=>{
-    btn.onclick = ()=>{
-      const i = parseInt(btn.dataset.i);
-      dmCtx.dm.splice(i,1);
-      if(dmCtx.selected===i) dmCtx.selected=null;
-      else if(dmCtx.selected>i) dmCtx.selected--;
-      drawDmCanvas(); renderDmList();
-      document.getElementById('dm_dirRow').style.display = dmCtx.selected!==null ? 'flex' : 'none';
-      updateDmDirButtons();
-    };
-  });
-}
-
-document.getElementById('dm_cancel').onclick = ()=>{ document.getElementById('dm_overlay').style.display='none'; dmCtx=null; };
-document.getElementById('dm_clear').onclick = ()=>{
-  dmCtx.dm = []; dmCtx.selected = null;
-  drawDmCanvas(); renderDmList();
-  document.getElementById('dm_dirRow').style.display = 'none';
-};
-document.getElementById('dm_save').onclick = ()=>{
-  const w = document.getElementById('dm_w').value;
-  const h = document.getElementById('dm_h').value;
-  const qty = document.getElementById('dm_qty').value || 1;
-  const note = document.getElementById('dm_note').value;
-  if(!w || !h){ alert('En ve Boy girmeden ekleyemezsin.'); return; }
-  if(dmCtx.lineIdx !== null){
-    lineState[dmCtx.lineIdx] = { w, h, qty, note, dm: dmCtx.dm };
-  } else {
-    const emptyIdx = lineState.findIndex(l=>!l.w && !l.h);
-    if(emptyIdx >= 0){
-      lineState[emptyIdx] = { w, h, qty, note, dm: dmCtx.dm };
-    } else {
-      lineState.push({ w, h, qty, note, dm: dmCtx.dm });
-    }
-  }
-  document.getElementById('dm_overlay').style.display='none';
-  dmCtx = null;
-  renderLines();
-};
+// Delik/Menfez kroki editörü kaldırıldı (2026-08-05) — Delik/Poz not alanı yeterli.
 
 // Excel'e gömülecek delik/menfez diyagramını bir <canvas>'a çizip PNG base64 döndürür.
 // Şablonla birebir aynı mantık: dikdörtgen (cam) + delik (daire) + üstten/soldan
