@@ -219,16 +219,12 @@
       <div class="field"><label>Adet</label><input id="dm_qty" type="number" value="1"></div>
     </div>
 
-    <div class="field" style="margin-bottom:10px;">
-      <label>Hazır şablon (En/Boy'u girdikten sonra seç)</label>
-      <select id="dm_template">
-        <option value="">— Şablon seç —</option>
-        <option value="kol2">Çift Kol Delikli (2)</option>
-        <option value="aski4">Askı Delikli (4)</option>
-        <option value="askikol">Askı + Çift Kol Delikli (6)</option>
-        <option value="mentese6">Menteşe + Çift Kol — 6 Delikli</option>
-        <option value="mentese8">Menteşe + Çift Kol — 8 Delikli</option>
-      </select>
+    <div class="field" style="margin-bottom:12px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; cursor:pointer;" id="sb_toggle">
+        <label style="margin:0;">🗂️ Hazır Şablonlar (teknik çizim)</label>
+        <span class="hint" id="sb_toggleArrow">▾</span>
+      </div>
+      <div id="sb_gallery" style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:8px;"></div>
     </div>
 
     <div class="hint" style="display:block; margin-bottom:6px; text-align:center;">Önizleme (mevcut bir deliğe tıklayıp menfez yönü/silme seçebilirsin):</div>
@@ -2808,7 +2804,6 @@ function openDelikEditor(lineIdx){
   document.getElementById('dm_note').value = l ? (l.note||'') : '';
   document.getElementById('dm_ust').value = '';
   document.getElementById('dm_yatay').value = '';
-  document.getElementById('dm_template').value = '';
   dmSetSide('sol');
   document.getElementById('dm_overlay').style.display = 'flex';
   document.getElementById('dm_dirRow').style.display = 'none';
@@ -2914,72 +2909,185 @@ document.getElementById('dm_addDelik').onclick = function(){
 };
 
 // ====================================================================
-// HAZIR DELİK ŞABLONLARI — atölyenin çizimlerinden alınan sabit ölçüler.
-// Tüm ölçüler mm; "ust" = üstten mesafe, "yatay" = ilgili kenardan (side) mesafe.
-// Kol delikleri her zaman camın boyuna göre ortalanır (boydan merkez delinecek).
+// ŞABLONLAR — atölyeden doğrulanmış sabit ölçüler (mm). Kol delikleri
+// her zaman camın boyuna göre ortalanır ("boydan merkez delinecek").
 // ====================================================================
-// Bir menteşe = 2 delik, aralarında sabit 45mm, kenardan sabit 24mm.
-// hingeStarts: her menteşenin ÜST deliğinin "ust" (mm) değerleri.
-function dmMenteseCiftleri(hingeStarts){
-  const holes = [];
-  hingeStarts.forEach(start=>{
-    holes.push({ust:start, yatay:24, side:'sol'});
-    holes.push({ust:start+45, yatay:24, side:'sol'});
-  });
-  return holes;
-}
-// N menteşe: ilki üstten 300mm, sonuncusu alttan 300mm biter, aradakiler
-// (varsa) camın boyuna göre eşit aralıklarla ortalanır.
-function dmMenteseHoles(n, h){
-  const first = 300, last = h - 345;
-  if(n === 1) return dmMenteseCiftleri([first]);
-  const starts = [first];
-  for(let i=1;i<n-1;i++) starts.push(first + (last-first)*i/(n-1));
-  starts.push(last);
-  return dmMenteseCiftleri(starts);
-}
-function dmAskiHoles(h){
-  return [
-    {ust:17, yatay:80, side:'sol'},
-    {ust:17, yatay:80, side:'sag'},
-    {ust:h-17, yatay:80, side:'sol'},
-    {ust:h-17, yatay:80, side:'sag'}
-  ];
-}
-function dmKolHoles(h, offset){
-  return [
-    {ust:h/2-80, yatay:offset, side:'sag'},
-    {ust:h/2+80, yatay:offset, side:'sag'}
-  ];
-}
-const DM_TEMPLATE_BUILDERS = {
-  kol2: (w,h)=> dmKolHoles(h, 50),
-  aski4: (w,h)=> dmAskiHoles(h),
-  askikol: (w,h)=> dmAskiHoles(h).concat(dmKolHoles(h,50)),
-  mentese6: (w,h)=> dmMenteseHoles(2,h).concat(dmKolHoles(h,100)),
-  mentese8: (w,h)=> dmMenteseHoles(3,h).concat(dmKolHoles(h,100))
+const SB = {
+  MENTESE_KENAR:24, MENTESE_ARA:45, MENTESE_UST_ALT:300, ORTA_MENTESE_UST:700,
+  MENTESE_KENAR_CC:20, MENTESE_ARA_CC:30,          // "Çift Menteşeli Camlar" panelinde farklı donanım
+  KOL_KENAR_MENTESELI:100, KOL_KENAR_TEK:50, KOL_ARALIK:160,
+  ASKI_KENAR:17, ASKI_UST_ALT:80,
+  BACA_CAP:100, BACA_UST:250   // ⚠️ gerçek bir kaynaktan doğrulanmadı, teyit gerekiyor
 };
-function applyDmTemplate(key){
+
+function sbMentesePair(u, kenar, ara, side){ return [{ust:u,yatay:kenar,side}, {ust:u+ara,yatay:kenar,side}]; }
+function sbMenteseCiftleri(starts, kenar, ara, side){
+  side = side || 'sol';
+  return starts.flatMap(u => sbMentesePair(u, kenar, ara, side));
+}
+function sbIkiMenteseli(h, kenar, ara, side){
+  return sbMenteseCiftleri([SB.MENTESE_UST_ALT, h - SB.MENTESE_UST_ALT - ara], kenar, ara, side);
+}
+function sbUcMenteseli(h, kenar, ara, side){
+  return sbMenteseCiftleri([SB.MENTESE_UST_ALT, SB.ORTA_MENTESE_UST, h - SB.MENTESE_UST_ALT - ara], kenar, ara, side);
+}
+function sbKolHoles(h, kenar, side){
+  side = side || 'sag';
+  return [{ust:h/2-SB.KOL_ARALIK/2, yatay:kenar, side}, {ust:h/2+SB.KOL_ARALIK/2, yatay:kenar, side}];
+}
+function sbAskiHoles(h){
+  return [
+    {ust:SB.ASKI_UST_ALT, yatay:SB.ASKI_KENAR, side:'sol'}, {ust:SB.ASKI_UST_ALT, yatay:SB.ASKI_KENAR, side:'sag'},
+    {ust:h-SB.ASKI_UST_ALT, yatay:SB.ASKI_KENAR, side:'sol'}, {ust:h-SB.ASKI_UST_ALT, yatay:SB.ASKI_KENAR, side:'sag'}
+  ];
+}
+
+const SB_TEMPLATES = {
+  askikol: {
+    ad:'Askı + Çift Kol', ornek:{w:400,h:900},
+    build:(w,h)=>({
+      holes: sbAskiHoles(h).concat(sbKolHoles(h, SB.KOL_KENAR_TEK)),
+      dims: [
+        {type:'v1', x:SB.ASKI_KENAR, y1:0, y2:SB.ASKI_UST_ALT, label:SB.ASKI_UST_ALT+'mm'},
+        {type:'h1', y:SB.ASKI_UST_ALT, x1:0, x2:SB.ASKI_KENAR, label:SB.ASKI_KENAR+'mm'},
+        {type:'v2', x:w-SB.KOL_KENAR_TEK, y1:h/2-SB.KOL_ARALIK/2, y2:h/2+SB.KOL_ARALIK/2, label:SB.KOL_ARALIK+'mm'}
+      ],
+      note:'askı ve çift kol delikli camlar\nkol delikleri boydan merkez delinecek'
+    })
+  },
+  mentese2: {
+    ad:'2 Menteşeli', ornek:{w:400,h:900},
+    build:(w,h)=>({
+      holes: sbIkiMenteseli(h, SB.MENTESE_KENAR, SB.MENTESE_ARA).concat(sbKolHoles(h, SB.KOL_KENAR_MENTESELI)),
+      dims: [
+        {type:'v1', x:SB.MENTESE_KENAR, y1:0, y2:SB.MENTESE_UST_ALT, label:SB.MENTESE_UST_ALT+'mm'},
+        {type:'v2', x:SB.MENTESE_KENAR-14, y1:SB.MENTESE_UST_ALT, y2:SB.MENTESE_UST_ALT+SB.MENTESE_ARA, label:SB.MENTESE_ARA+'mm'},
+        {type:'v2', x:w-SB.KOL_KENAR_MENTESELI, y1:h/2-SB.KOL_ARALIK/2, y2:h/2+SB.KOL_ARALIK/2, label:SB.KOL_ARALIK+'mm'}
+      ],
+      note:'menteşe ve çift kol delikli camlar\nkol delikleri boydan merkez delinecek'
+    })
+  },
+  mentese3: {
+    ad:'3 Menteşeli', ornek:{w:400,h:1100},
+    build:(w,h)=>({
+      holes: sbUcMenteseli(h, SB.MENTESE_KENAR, SB.MENTESE_ARA).concat(sbKolHoles(h, SB.KOL_KENAR_MENTESELI)),
+      dims: [
+        {type:'v1', x:SB.MENTESE_KENAR, y1:0, y2:SB.MENTESE_UST_ALT, label:SB.MENTESE_UST_ALT+'mm'},
+        {type:'v1', x:SB.MENTESE_KENAR-14, y1:0, y2:SB.ORTA_MENTESE_UST, label:SB.ORTA_MENTESE_UST+'mm'},
+        {type:'v2', x:w-SB.KOL_KENAR_MENTESELI, y1:h/2-SB.KOL_ARALIK/2, y2:h/2+SB.KOL_ARALIK/2, label:SB.KOL_ARALIK+'mm'}
+      ],
+      note:'3 menteşe + çift kol delikli camlar\nkol delikleri boydan merkez delinecek'
+    })
+  },
+  ciftmentese: {
+    ad:'Çift Menteşeli Camlar', ornek:{w:400,h:900},
+    build:(w,h)=>({
+      // Bu şablon eşleşen 2 cam için: burada "kollu" (dış) taraf üretiliyor —
+      // eşi olan sade cam, aynı menteşe zincirinin ayna-simetriği (kenar 20mm/ara 30mm).
+      holes: sbIkiMenteseli(h, SB.MENTESE_KENAR_CC, SB.MENTESE_ARA_CC).concat(sbKolHoles(h, SB.KOL_KENAR_MENTESELI)),
+      dims: [
+        {type:'v1', x:SB.MENTESE_KENAR_CC, y1:0, y2:SB.MENTESE_UST_ALT, label:SB.MENTESE_UST_ALT+'mm'},
+        {type:'v2', x:SB.MENTESE_KENAR_CC-14, y1:SB.MENTESE_UST_ALT, y2:SB.MENTESE_UST_ALT+SB.MENTESE_ARA_CC, label:SB.MENTESE_ARA_CC+'mm'},
+        {type:'v2', x:w-SB.KOL_KENAR_MENTESELI, y1:h/2-SB.KOL_ARALIK/2, y2:h/2+SB.KOL_ARALIK/2, label:SB.KOL_ARALIK+'mm'}
+      ],
+      note:'MENTEŞE DELİKLİ CAMLAR İÇİN\nÇİFT kol delikleri boydan merkez delinecek\n(eşi: sade menteşeli, ayna simetrik)'
+    })
+  },
+  isicam: {
+    ad:'Isı Cam + Baca Deliği', ornek:{w:400,h:600},
+    build:(w,h)=>({
+      holes: [{ust:SB.BACA_UST, yatay:w/2, side:'sol'}],
+      dims: [
+        {type:'v1', x:w/2, y1:0, y2:SB.BACA_UST, label:SB.BACA_UST+'mm ⚠️'}
+      ],
+      note:'ısı cam + baca/menfez deliği\n⚠️ çap ve konum örnek — teyit gerekli',
+      holeRadius: SB.BACA_CAP/2
+    })
+  },
+  ciftkol: {
+    ad:'Çift Kol Delikli (sade)', ornek:{w:400,h:700},
+    build:(w,h)=>({
+      holes: sbKolHoles(h, SB.KOL_KENAR_TEK),
+      dims: [
+        {type:'v2', x:w-SB.KOL_KENAR_TEK, y1:h/2-SB.KOL_ARALIK/2, y2:h/2+SB.KOL_ARALIK/2, label:SB.KOL_ARALIK+'mm'}
+      ],
+      note:'çift kol delikli camlar için\nkol delikleri boydan merkez delinecek'
+    })
+  }
+};
+
+// --- SVG teknik çizim üretici (VBA'daki CizDelik/CizOk/CizCiftYonuOk/CizMetinKutusu karşılığı) ---
+function sbSvg(w, h, tpl){
+  const padL=90, padR=70, padT=40, padB= (tpl.note.split('\n').length*13)+40;
+  const vbW = w+padL+padR, vbH = h+padT+padB;
+  const X = x => x+padL, Y = y => y+padT;
+  let out = `<svg viewBox="0 0 ${vbW} ${vbH}" style="width:100%; height:auto; max-height:170px;">`;
+  out += `<defs><marker id="sbArr" markerWidth="7" markerHeight="7" refX="5" refY="2.5" orient="auto"><path d="M0,0 L5,2.5 L0,5 Z" fill="#333"/></marker></defs>`;
+  out += `<rect x="${X(0)}" y="${Y(0)}" width="${w}" height="${h}" fill="#f5f7fa" stroke="#111" stroke-width="2"/>`;
+  (tpl.holes||[]).forEach(p=>{
+    const x = p.side==='sag' ? w - p.yatay : p.yatay;
+    out += `<circle cx="${X(x)}" cy="${Y(p.ust)}" r="${tpl.holeRadius||7}" fill="#fff" stroke="#111" stroke-width="1.3"/>`;
+  });
+  (tpl.dims||[]).forEach(d=>{
+    if(d.type==='v1'){
+      const x=X(d.x);
+      out += `<line x1="${x}" y1="${Y(d.y1)}" x2="${x}" y2="${Y(d.y2)}" stroke="#333" stroke-width="1" marker-end="url(#sbArr)"/>`;
+      out += `<text x="${x-6}" y="${Y((d.y1+d.y2)/2)}" font-size="10" text-anchor="end" fill="#333">${d.label}</text>`;
+    } else if(d.type==='v2'){
+      const x=X(d.x);
+      out += `<line x1="${x}" y1="${Y(d.y1)}" x2="${x}" y2="${Y(d.y2)}" stroke="#333" stroke-width="1" marker-end="url(#sbArr)" marker-start="url(#sbArr)"/>`;
+      out += `<text x="${x+6}" y="${Y((d.y1+d.y2)/2)}" font-size="10" text-anchor="start" fill="#333">${d.label}</text>`;
+    } else if(d.type==='h1'){
+      const y=Y(d.y);
+      out += `<line x1="${X(d.x1)}" y1="${y}" x2="${X(d.x2)}" y2="${y}" stroke="#333" stroke-width="1" marker-end="url(#sbArr)"/>`;
+      out += `<text x="${X((d.x1+d.x2)/2)}" y="${y-6}" font-size="10" text-anchor="middle" fill="#333">${d.label}</text>`;
+    }
+  });
+  tpl.note.split('\n').forEach((line,i)=>{
+    out += `<text x="${X(w/2)}" y="${Y(h)+22+(i*13)}" font-size="10" font-weight="600" text-anchor="middle" fill="#111">${line}</text>`;
+  });
+  out += `</svg>`;
+  return out;
+}
+
+function sbApplyTemplate(key){
   const w = parseFloat(document.getElementById('dm_w').value);
   const h = parseFloat(document.getElementById('dm_h').value);
   if(!w || !h){ alert('Önce En ve Boy değerlerini gir.'); return; }
-  const builder = DM_TEMPLATE_BUILDERS[key];
-  if(!builder) return;
-  dmCtx.dm = builder(w,h).map(p=>({
+  const tpl = SB_TEMPLATES[key].build(w,h);
+  dmCtx.dm = tpl.holes.map(p=>({
     x: p.side==='sag' ? Math.min(Math.max(1-(p.yatay/w),0),1) : Math.min(Math.max(p.yatay/w,0),1),
     y: Math.min(Math.max(p.ust/h,0),1),
-    ust: p.ust, yatay: p.yatay, side: p.side, dirs: []
+    ust:p.ust, yatay:p.yatay, side:p.side, dirs:[]
   }));
   dmCtx.selected = null;
+  document.getElementById('dm_note').value = tpl.note.replace(/\n/g,' — ');
   drawDmCanvas();
   renderDmList();
   document.getElementById('dm_dirRow').style.display = 'none';
 }
-document.getElementById('dm_template').onchange = function(){
-  const key = this.value;
-  this.value = '';
-  if(!key) return;
-  applyDmTemplate(key);
+
+function renderSbGallery(){
+  const gallery = document.getElementById('sb_gallery');
+  gallery.innerHTML = Object.keys(SB_TEMPLATES).map(key=>{
+    const t = SB_TEMPLATES[key];
+    const preview = sbSvg(t.ornek.w, t.ornek.h, t.build(t.ornek.w, t.ornek.h));
+    return `<div class="sb-card" data-key="${key}" style="border:1px solid var(--border); border-radius:var(--radius-sm); padding:6px; cursor:pointer; background:var(--surface-2); text-align:center;">
+      ${preview}
+      <div style="font-size:11px; font-weight:600; margin-top:4px;">${t.ad}</div>
+    </div>`;
+  }).join('');
+  gallery.querySelectorAll('.sb-card').forEach(card=>{
+    card.onclick = ()=> sbApplyTemplate(card.dataset.key);
+  });
+}
+renderSbGallery();
+
+let sbGalleryOpen = true;
+document.getElementById('sb_toggle').onclick = function(){
+  sbGalleryOpen = !sbGalleryOpen;
+  document.getElementById('sb_gallery').style.display = sbGalleryOpen ? 'grid' : 'none';
+  document.getElementById('sb_toggleArrow').textContent = sbGalleryOpen ? '▾' : '▸';
 };
 
 function updateDmDirButtons(){
