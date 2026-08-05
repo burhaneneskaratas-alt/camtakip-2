@@ -2218,8 +2218,11 @@ function openEditOrder(o, isSellerView){
     setSegVal(prefix+'_renk', o.renk || 'Füme');
   }
 
-  lineState = (o.lines||[]).map(l=>({w:l.w, h:l.h, qty:l.qty, note:l.note||'', dm:(l.dm||[]).map(d=>({...d})), delikSablon: l.delikSablon ? JSON.parse(JSON.stringify(l.delikSablon)) : null, sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:(l.isicam && l.isicam.renk) ? {...l.isicam} : {...isicamState}, fiyat:l.fiyat||''}));
-  if(lineState.length===0) lineState.push({w:'',h:'',qty:1,note:'',sekilli:false, fiyat:'', isicam: {...isicamState}});
+  // isicam: sadece o satır için ÖZEL OLARAK değiştirilmişse (.renk dolu) donmuş halde
+  // taşınır; yoksa null bırakılır — üstteki genel Isıcam ayarını (isicamState) CANLI takip
+  // etsin diye (aksi halde satır oluşturulduğu andaki eski değerde donup kalıyordu).
+  lineState = (o.lines||[]).map(l=>({w:l.w, h:l.h, qty:l.qty, note:l.note||'', dm:(l.dm||[]).map(d=>({...d})), delikSablon: l.delikSablon ? JSON.parse(JSON.stringify(l.delikSablon)) : null, sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:(l.isicam && l.isicam.renk) ? {...l.isicam} : null, fiyat:l.fiyat||''}));
+  if(lineState.length===0) lineState.push({w:'',h:'',qty:1,note:'',sekilli:false, fiyat:'', isicam: null});
   renderLines();
 
   const submitBtn = document.getElementById(prefix+'_submit');
@@ -2245,14 +2248,25 @@ function cancelEdit(prefix){
 }
 
 function addLine(){
-  lineState.push({w:'',h:'',qty:1,note:'',sekilli:false, fiyat:'', isicam: {...isicamState}});
+  lineState.push({w:'',h:'',qty:1,note:'',sekilli:false, fiyat:'', isicam: null});
   renderLines();
 }
 function removeLine(idx){
   lineState.splice(idx,1);
-  if(lineState.length===0) lineState.push({w:'',h:'',qty:1,note:'',sekilli:false, fiyat:'', isicam: {...isicamState}});
+  if(lineState.length===0) lineState.push({w:'',h:'',qty:1,note:'',sekilli:false, fiyat:'', isicam: null});
   renderLines();
 }
+// Bir satırın Isıcam ayarı: o satır için özel olarak değiştirilmişse (.isicam.renk dolu)
+// onu, değilse üstteki genel/canlı isicamState'i kullanır — böylece kullanıcı üstteki
+// genel Isıcam ayarını sonradan değiştirirse, özelleştirilmemiş satırlar otomatik takip eder.
+function resolveLineIsicam(l){
+  return (l && l.isicam && l.isicam.renk) ? l.isicam : isicamState;
+}
+function resolveLineIsicamText(l){
+  const ic = resolveLineIsicam(l);
+  return `${ic.dis||4}+${ic.bosluk||12}+${ic.ic||4} ${ic.renk||'—'}`;
+}
+
 function renderLines(){
   const prefix = profile.role==='satici' ? 'w' : 'c';
   const el = document.getElementById(prefix+'_lines');
@@ -2268,7 +2282,7 @@ function renderLines(){
         <input type="checkbox" data-field="sekilli" data-idx="${i}" ${l.sekilli?'checked':''}> ŞKL
       </label>
       <span class="line-m2">${fmtM2(lineM2(l))}</span>
-      ${isicamEnabled ? `<span class="line-isicam-compact" data-idx="${i}" style="font-size:11px;color:var(--text-mut);cursor:pointer;padding:4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);white-space:nowrap;display:inline-block;user-select:none;" title="Tıkla: Bu satırın Isıcam'ını düzenle">${(l.isicam?.dis||4)}+${(l.isicam?.bosluk||12)}+${(l.isicam?.ic||4)} ${(l.isicam?.renk||'—')}</span>` : `<span></span>`}
+      ${isicamEnabled ? `<span class="line-isicam-compact ${(l.isicam&&l.isicam.renk)?'has-data':''}" data-idx="${i}" style="font-size:11px;color:var(--text-mut);cursor:pointer;padding:4px 8px;border-radius:var(--radius-sm);border:1px solid var(--border);background:var(--surface-2);white-space:nowrap;display:inline-block;user-select:none;" title="${(l.isicam&&l.isicam.renk)?'Bu satır için özel ayarlandı — tıkla düzenle':'Üstteki genel Isıcam ayarını takip ediyor — tıkla bu satır için özelleştir'}">${resolveLineIsicamText(l)}</span>` : `<span></span>`}
       <button class="line-delik-sablon ${l.delikSablon?'has-data':''}" data-idx="${i}" title="Delik/Poz şablonu seç">🔧${l.delikSablon?' 1':''}</button>
       <button class="line-del" data-idx="${i}" title="Satırı sil">×</button>
     </div>
@@ -2397,7 +2411,7 @@ function renderLines(){
 // ====================================================================
 function openIsicamLineEditor(lineIdx){
   const line = lineState[lineIdx] || {};
-  const currentIsicam = (line.isicam && line.isicam.renk) ? line.isicam : {...isicamState};
+  const currentIsicam = resolveLineIsicam(line);
   
   const modal = document.createElement('div');
   modal.style.cssText = `
@@ -2705,9 +2719,9 @@ function renderLinesResult(previewImg, data){
       const emptyIdx = lineState.findIndex(l=>!l.w && !l.h);
       if(emptyIdx >= 0 && eklenen === 0){
         const mevcutNot = lineState[emptyIdx].note || '';
-        lineState[emptyIdx] = { w: en, h: boy, qty: adet, note: [mevcutNot, otoNot].filter(Boolean).join(' — '), dm: [], sekilli: false, isicam: {...isicamState} };
+        lineState[emptyIdx] = { w: en, h: boy, qty: adet, note: [mevcutNot, otoNot].filter(Boolean).join(' — '), dm: [], sekilli: false, isicam: null };
       } else {
-        lineState.push({ w: en, h: boy, qty: adet, note: otoNot, dm: [], sekilli: false, isicam: {...isicamState} });
+        lineState.push({ w: en, h: boy, qty: adet, note: otoNot, dm: [], sekilli: false, isicam: null });
       }
       eklenen++;
     });
