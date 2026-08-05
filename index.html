@@ -220,6 +220,7 @@
       <div id="ds_canvasWrap" style="position:relative; margin:0 auto 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm);"></div>
       <div class="form-actions">
         <button class="btn btn-primary btn-sm" id="ds_save">Ekle</button>
+        <button class="btn btn-ghost btn-sm" id="ds_remove" style="color:var(--danger);">Şablonu Kaldır</button>
         <button class="btn btn-ghost btn-sm" id="ds_cancel">İptal</button>
       </div>
     </div>
@@ -3054,6 +3055,14 @@ document.getElementById('ds_back').onclick = ()=>{
 document.getElementById('ds_cancel').onclick = ()=>{
   document.getElementById('ds_overlay').style.display = 'none';
   dsCtx = null;
+};
+document.getElementById('ds_remove').onclick = ()=>{
+  if(!dsCtx) return;
+  if(!confirm('Bu satırdaki delik/poz şablonu kaldırılsın mı?')) return;
+  lineState[dsCtx.lineIdx].delikSablon = null;
+  document.getElementById('ds_overlay').style.display = 'none';
+  dsCtx = null;
+  renderLines();
 };
 document.getElementById('ds_save').onclick = ()=>{
   if(!dsCtx || !dsCtx.sablon) return;
