@@ -220,6 +220,7 @@
       <div id="ds_canvasWrap" style="position:relative; margin:0 auto 12px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm);"></div>
       <div class="form-actions">
         <button class="btn btn-primary btn-sm" id="ds_save">Ekle</button>
+        <button class="btn btn-ghost btn-sm" id="ds_saveDefault">💾 Standart Ölçüm Yap</button>
         <button class="btn btn-ghost btn-sm" id="ds_remove" style="color:var(--danger);">Şablonu Kaldır</button>
         <button class="btn btn-ghost btn-sm" id="ds_cancel">İptal</button>
       </div>
@@ -3026,6 +3027,14 @@ function renderDsGallery(){
     card.onclick = ()=> openDsDetail(card.dataset.key);
   });
 }
+// Kullanıcının kendi kaydettiği standart ölçüsü (profiles.delik_varsayilanlari) —
+// yoksa boş nesne döner, çağıran taraf fabrika varsayılanına (a.def) düşer.
+function dsOzelVarsayilan(key, panelKey){
+  const v = (profile && profile.delik_varsayilanlari) ? profile.delik_varsayilanlari[key] : null;
+  if(!v) return {};
+  if(panelKey) return (v.paneller && v.paneller[panelKey] && v.paneller[panelKey].olculer) || {};
+  return v.olculer || {};
+}
 function openDsDetail(key){
   dsCtx.sablon = key;
   const tpl = DELIK_SABLON_TANIMLARI[key];
@@ -3042,15 +3051,18 @@ function openDsDetail(key){
     const existing = tpl.multiPanel
       ? ((mevcutSablon && mevcutSablon.paneller && mevcutSablon.paneller[p.key]) ? mevcutSablon.paneller[p.key].olculer : {})
       : (mevcutSablon ? mevcutSablon.olculer : {});
+    const ozelVarsayilan = dsOzelVarsayilan(key, p.key);
     p.arrows.forEach(a=>{
       if(a.decorative) return; // sadece nota işaret eden ok — ölçü girişi yok
       const lbl = dsAutoLabel(a);
       const inp = document.createElement('input');
       inp.type = 'number'; inp.step = '1'; inp.placeholder = 'mm';
       inp.id = 'ds_inp_'+prefix+a.id;
-      // Önce daha önce bu satıra kaydedilmiş değer, yoksa şablonun sabit varsayılanı
-      // (atölyenin standart ölçüsü) gösterilir — kullanıcı isterse üzerine yazar.
-      inp.value = (existing[a.id]!=null) ? existing[a.id] : (a.def!=null ? a.def : '');
+      // Sıra: (1) bu satıra daha önce kaydedilmiş değer, (2) kullanıcının kendi
+      // standart ölçüsü olarak kaydettiği değer, (3) fabrika (VBA'dan gelen) varsayılanı.
+      inp.value = (existing[a.id]!=null) ? existing[a.id]
+                : (ozelVarsayilan[a.id]!=null) ? ozelVarsayilan[a.id]
+                : (a.def!=null ? a.def : '');
       inp.style.cssText = `position:absolute; width:56px; padding:3px 4px; font-size:14px; font-weight:600; text-align:center; border:1.5px solid var(--accent); border-radius:3px; background:#fff; left:${(lbl.x-tpl.viewBox.x)/tpl.viewBox.w*100}%; top:${(lbl.y-tpl.viewBox.y)/tpl.viewBox.h*100}%; transform:translate(-50%,-50%);`;
       wrap.appendChild(inp);
     });
@@ -3082,29 +3094,52 @@ document.getElementById('ds_remove').onclick = ()=>{
   dsCtx = null;
   renderLines();
 };
+// Panelin ekrandaki inputlarından girilen mm değerlerini okur ({ok_id: sayı|null}).
+function dsReadPanelOlculer(p, prefix){
+  const olculer = {};
+  p.arrows.forEach(a=>{
+    if(a.decorative) return;
+    const v = document.getElementById('ds_inp_'+prefix+a.id).value;
+    olculer[a.id] = (v!=='' && v!=null) ? parseFloat(v) : null;
+  });
+  return olculer;
+}
+// Ekrandaki inputlardan, hem satıra kaydetmek hem de "standart ölçüm" olarak
+// profile kaydetmek için aynı şekilde kullanılacak veri yapısını üretir.
+function dsReadCurrentOlculerData(tpl){
+  if(tpl.multiPanel){
+    const paneller = {};
+    dsTemplatePanels(tpl).forEach(p=>{ paneller[p.key] = {olculer: dsReadPanelOlculer(p, p.key+'_')}; });
+    return {paneller};
+  }
+  return {olculer: dsReadPanelOlculer(tpl, '')};
+}
 document.getElementById('ds_save').onclick = ()=>{
   if(!dsCtx || !dsCtx.sablon) return;
   const tpl = DELIK_SABLON_TANIMLARI[dsCtx.sablon];
-  const readPanelOlculer = (p, prefix)=>{
-    const olculer = {};
-    p.arrows.forEach(a=>{
-      if(a.decorative) return;
-      const v = document.getElementById('ds_inp_'+prefix+a.id).value;
-      olculer[a.id] = (v!=='' && v!=null) ? parseFloat(v) : null;
-    });
-    return olculer;
-  };
-  if(tpl.multiPanel){
-    const paneller = {};
-    dsTemplatePanels(tpl).forEach(p=>{ paneller[p.key] = {olculer: readPanelOlculer(p, p.key+'_')}; });
-    lineState[dsCtx.lineIdx].delikSablon = {sablon: dsCtx.sablon, paneller};
-  } else {
-    const olculer = readPanelOlculer(tpl, '');
-    lineState[dsCtx.lineIdx].delikSablon = {sablon: dsCtx.sablon, olculer};
-  }
+  const data = dsReadCurrentOlculerData(tpl);
+  lineState[dsCtx.lineIdx].delikSablon = tpl.multiPanel
+    ? {sablon: dsCtx.sablon, paneller: data.paneller}
+    : {sablon: dsCtx.sablon, olculer: data.olculer};
   document.getElementById('ds_overlay').style.display = 'none';
   dsCtx = null;
   renderLines();
+};
+document.getElementById('ds_saveDefault').onclick = async ()=>{
+  if(!dsCtx || !dsCtx.sablon) return;
+  const tpl = DELIK_SABLON_TANIMLARI[dsCtx.sablon];
+  const data = dsReadCurrentOlculerData(tpl);
+  const btn = document.getElementById('ds_saveDefault');
+  const eskiMetin = btn.textContent;
+  btn.textContent = 'Kaydediliyor…'; btn.disabled = true;
+  const yeniVarsayilanlar = Object.assign({}, profile.delik_varsayilanlari||{});
+  yeniVarsayilanlar[dsCtx.sablon] = data;
+  const {error} = await sb.from('profiles').update({delik_varsayilanlari: yeniVarsayilanlar}).eq('id', profile.id);
+  btn.disabled = false;
+  if(error){ alert('Standart ölçüm kaydedilemedi: ' + error.message); btn.textContent = eskiMetin; return; }
+  profile.delik_varsayilanlari = yeniVarsayilanlar;
+  btn.textContent = '✓ Kaydedildi';
+  setTimeout(()=>{ btn.textContent = eskiMetin; }, 1500);
 };
 
 // ====================================================================
