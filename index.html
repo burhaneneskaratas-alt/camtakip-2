@@ -232,6 +232,7 @@
 const SETUP_MISSING = SUPABASE_URL.includes('BURAYA') || SUPABASE_ANON_KEY.includes('BURAYA');
 const sb = SETUP_MISSING ? null : window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 const OLCU_OKU_FN_URL = SUPABASE_URL + '/functions/v1/olcu-oku';
+const CREATE_CUSTOMER_FN_URL = SUPABASE_URL + '/functions/v1/create-customer';
 
 // Sessizce başarısız olabilecek Supabase işlemlerini (silme/güncelleme/aç-kapa
 // gibi status/hata alanı gösterilmeyen butonlarda) kullanıcıya bildirmek için
@@ -294,8 +295,6 @@ function orderThicknessKey(o){
 let lineState = [];
 let isicamState = {dis: 4, bosluk: 12, ic: 4, renk: 'Şeffaf+Şeffaf'}; // seçili Isıcam
 let editingOrderId = null; // düzenleme modundaysak sipariş id'si, değilse null
-let authMode = 'login'; // 'login' | 'signup'
-let authRole = 'musteri';
 
 let myProducts = [];       // satıcı: kendi ürün kataloğu (products tablosu)
 let customerProducts = []; // müşteri: seçilen atölyenin ürün kataloğu
@@ -350,6 +349,16 @@ function paneGlyph(lines){
 /* =========================================================
    AUTH SCREEN
    ========================================================= */
+// Self-servis "Kayıt Ol" kaldırıldı (06 Ağustos 2026) — artık sadece satıcı,
+// kendi ekranındaki "Müşteri Ekle" ile müşteri hesabı açabiliyor (bkz.
+// createCustomerAccount). Bu ekranda sadece giriş var. Giriş kutusuna "@"
+// içeren bir şey yazılırsa e-posta (satıcı girişi) olarak, içermiyorsa
+// kullanıcı adı (müşteri girişi) olarak yorumlanır — bkz. usernameToFakeEmail.
+const CUSTOMER_EMAIL_DOMAIN = 'musteri.kuantecam.local';
+function usernameToFakeEmail(username){
+  const clean = String(username).trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+  return clean ? clean + '@' + CUSTOMER_EMAIL_DOMAIN : null;
+}
 function renderAuth(){
   app.innerHTML = `
     <div class="auth-wrap">
@@ -362,87 +371,37 @@ function renderAuth(){
         <div class="brand-name">CamTakip</div>
         <div class="brand-sub">Fason kesim &amp; sipariş sistemi</div>
       </div>
-      <div class="auth-tabs">
-        <button id="atLogin" class="${authMode==='login'?'active':''}">Giriş Yap</button>
-        <button id="atSignup" class="${authMode==='signup'?'active':''}">Kayıt Ol</button>
-      </div>
       <div class="pane form-card">
-        ${authMode==='signup' ? `
-          <div class="field-grid two" style="margin-bottom:14px;">
-            <div class="field" style="grid-column:1/-1;">
-              <label>Hesap tipi</label>
-              <div class="seg" data-group="authRole">
-                <button data-val="musteri" class="${authRole==='musteri'?'active':''}">Müşteriyim</button>
-                <button data-val="satici" class="${authRole==='satici'?'active':''}">Satıcı / Atölyeyim</button>
-              </div>
-            </div>
-          </div>
-          <div class="field" style="margin-bottom:12px;">
-            <label for="a_name">Ad soyad</label>
-            <input id="a_name" type="text" placeholder="Ahmet Yılmaz">
-          </div>
-          <div class="field" style="margin-bottom:12px; ${authRole==='satici'?'':'display:none;'}" id="wsField">
-            <label for="a_ws">Atölye / işletme adı</label>
-            <input id="a_ws" type="text" placeholder="Yılmaz Cam Atölyesi">
-          </div>
-        ` : ''}
         <div class="field" style="margin-bottom:12px;">
-          <label for="a_email">E-posta</label>
-          <input id="a_email" type="email" placeholder="ornek@eposta.com">
+          <label for="a_email">E-posta (satıcı) veya kullanıcı adı (müşteri)</label>
+          <input id="a_email" type="text" placeholder="ornek@eposta.com veya kullaniciadi">
         </div>
         <div class="field" style="margin-bottom:8px;">
           <label for="a_pass">Şifre</label>
           <input id="a_pass" type="password" placeholder="En az 6 karakter">
         </div>
         <div class="form-actions">
-          <button class="btn btn-primary" id="a_submit">${authMode==='login'?'Giriş yap':'Kayıt ol'}</button>
+          <button class="btn btn-primary" id="a_submit">Giriş yap</button>
           <span class="err" id="a_err"></span>
         </div>
       </div>
     </div>
   `;
-  document.getElementById('atLogin').onclick = ()=>{ authMode='login'; renderAuth(); };
-  document.getElementById('atSignup').onclick = ()=>{ authMode='signup'; renderAuth(); };
-  if(authMode==='signup'){
-    document.querySelectorAll('.seg[data-group="authRole"] button').forEach(b=>{
-      b.onclick = ()=>{ authRole = b.dataset.val; renderAuth(); };
-    });
-  }
   document.getElementById('a_submit').onclick = handleAuthSubmit;
 }
 
 async function handleAuthSubmit(){
-  const email = document.getElementById('a_email').value.trim();
+  const raw = document.getElementById('a_email').value.trim();
   const pass = document.getElementById('a_pass').value;
   const errEl = document.getElementById('a_err');
   errEl.textContent = '';
-  if(!email || !pass){ errEl.textContent = 'E-posta ve şifre gerekli.'; return; }
+  if(!raw || !pass){ errEl.textContent = 'E-posta/kullanıcı adı ve şifre gerekli.'; return; }
+  const email = raw.includes('@') ? raw : usernameToFakeEmail(raw);
+  if(!email){ errEl.textContent = 'Geçersiz kullanıcı adı.'; return; }
 
-  if(authMode === 'login'){
-    const {data, error} = await sb.auth.signInWithPassword({email, password:pass});
-    if(error){ errEl.textContent = 'Giriş başarısız: ' + error.message; return; }
-    await afterAuth();
-  } else {
-    const name = document.getElementById('a_name').value.trim();
-    const ws = document.getElementById('a_ws') ? document.getElementById('a_ws').value.trim() : '';
-    if(!name){ errEl.textContent = 'Ad soyad gerekli.'; return; }
-    const {data, error} = await sb.auth.signUp({email, password:pass});
-    if(error){ errEl.textContent = 'Kayıt başarısız: ' + error.message; return; }
-    const uid = data.user ? data.user.id : (data.session ? data.session.user.id : null);
-    if(uid){
-      const {error: profileErr} = await sb.from('profiles').insert({id:uid, full_name:name, role:authRole, workshop_name: authRole==='satici'?ws:null});
-      if(profileErr){
-        errEl.textContent = 'Hesap oluştu ama profil kaydedilemedi: ' + profileErr.message + ' — lütfen destekle iletişime geçin.';
-        return;
-      }
-    }
-    if(data.session){
-      await afterAuth();
-    } else {
-      errEl.style.color = 'var(--accent)';
-      errEl.textContent = 'Kayıt alındı. E-postanızı onayladıktan sonra giriş yapabilirsiniz.';
-    }
-  }
+  const {data, error} = await sb.auth.signInWithPassword({email, password:pass});
+  if(error){ errEl.textContent = 'Giriş başarısız: ' + error.message; return; }
+  await afterAuth();
 }
 
 /* =========================================================
@@ -486,7 +445,6 @@ async function handleLogout(){
   teardownRealtime();
   await sb.auth.signOut();
   session = null; profile = null; orders = [];
-  authMode = 'login';
   renderAuth();
 }
 
@@ -755,6 +713,20 @@ function renderWorkshop(){
         </div>
       </div>
     </details>
+    <details class="pane collapsible" style="margin-bottom:14px;">
+      <summary>👤 Müşteri hesabı ekle <span class="hint">(kullanıcı adı + şifre ile — e-posta gerekmez)</span></summary>
+      <div class="collapsible-body">
+        <div class="field-grid two">
+          <div class="field"><label for="mc_username">Kullanıcı adı</label><input id="mc_username" type="text" placeholder="örn. ahmetbayi"></div>
+          <div class="field"><label for="mc_pass">Şifre</label><input id="mc_pass" type="text" placeholder="En az 6 karakter"></div>
+        </div>
+        <div class="field"><label for="mc_name">Ad soyad / firma adı</label><input id="mc_name" type="text" placeholder="Ahmet Yılmaz"></div>
+        <div class="form-actions">
+          <button class="btn btn-sm" id="mc_create">Hesap oluştur</button>
+          <span class="hint" id="mc_status"></span>
+        </div>
+      </div>
+    </details>
     <div class="stat-strip" id="statStrip"></div>
     <details class="pane collapsible" style="margin-bottom:20px;">
       <summary>📦 Ürün kataloğu</summary>
@@ -893,6 +865,7 @@ function renderWorkshop(){
   renderReportSection();
   renderCatalogSection();
   document.getElementById('s_save').onclick = saveCompanyInfo;
+  document.getElementById('mc_create').onclick = createCustomerAccount;
   initSeg('w_temper');
   initSeg('w_edge');
   initSeg('w_renk');
@@ -953,6 +926,43 @@ async function saveCompanyInfo(){
   Object.assign(profile, updates);
   statusEl.textContent = 'Kaydedildi ✓';
   setTimeout(()=>statusEl.textContent='',2000);
+}
+
+// Satıcının kendi oturumunu bozmadan yeni bir müşteri hesabı açması — normal
+// sb.auth.signUp() bunu yapamaz çünkü tarayıcıyı anında yeni açılan hesaba
+// geçirir. Bunun yerine servis anahtarıyla çalışan create-customer Edge
+// Function'ı çağırıyoruz, kendi oturumumuzun access_token'ını Authorization
+// header'ında göndererek "gerçekten satıcı mıyım" doğrulamasını ona bırakıyoruz.
+async function createCustomerAccount(){
+  const statusEl = document.getElementById('mc_status');
+  const username = document.getElementById('mc_username').value.trim();
+  const password = document.getElementById('mc_pass').value;
+  const fullName = document.getElementById('mc_name').value.trim();
+  statusEl.style.color = '';
+  if(!username){ statusEl.textContent = 'Kullanıcı adı gerekli.'; return; }
+  if(!password || password.length < 6){ statusEl.textContent = 'Şifre en az 6 karakter olmalı.'; return; }
+  if(!fullName){ statusEl.textContent = 'Ad soyad / firma adı gerekli.'; return; }
+  statusEl.textContent = 'Oluşturuluyor…';
+  try{
+    const {data:{session:s}} = await sb.auth.getSession();
+    const res = await fetch(CREATE_CUSTOMER_FN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'Bearer ' + (s ? s.access_token : SUPABASE_ANON_KEY)
+      },
+      body: JSON.stringify({username, password, full_name: fullName})
+    });
+    const data = await res.json();
+    if(!res.ok || data.error){ statusEl.textContent = 'Hata: ' + (data.error || 'Hesap oluşturulamadı'); return; }
+    document.getElementById('mc_username').value = '';
+    document.getElementById('mc_pass').value = '';
+    document.getElementById('mc_name').value = '';
+    statusEl.style.color = 'var(--primary)';
+    statusEl.textContent = `Hesap oluşturuldu ✓ Kullanıcı adı: ${data.username}`;
+  } catch(err){
+    statusEl.textContent = 'Bağlantı hatası: ' + err.message;
+  }
 }
 
 async function submitWorkshopOrder(){
