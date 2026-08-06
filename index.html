@@ -299,6 +299,7 @@ let editingOrderId = null; // düzenleme modundaysak sipariş id'si, değilse nu
 let myProducts = [];       // satıcı: kendi ürün kataloğu (products tablosu)
 let customerProducts = []; // müşteri: seçilen atölyenin ürün kataloğu
 let catalogFilter = 'all'; // katalog yönetim ekranında kategori filtresi
+let myCustomers = [];      // satıcı: kendi açtığı müşteri hesapları (profiles, seller_id=ben)
 
 let realtimeChannel = null; // yeni sipariş geldiğinde ekranı otomatik güncellemek için
 const KUANTE_LOGO_B64 = '/9j/4AAQSkZJRgABAQEAYABgAAD/4QLQRXhpZgAATU0AKgAAAAgABAE7AAIAAAADaHAAAIdpAAQAAAABAAABSpydAAEAAAAGAAACwuocAAcAAAEMAAAAPgAAAAAc6gAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWQAwACAAAAFAAAApiQBAACAAAAFAAAAqySkQACAAAAAzgwAACSkgACAAAAAzgwAADqHAAHAAABDAAAAYwAAAAAHOoAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADIwMjY6MDI6MTMgMTI6MDk6MjEAMjAyNjowMjoxMyAxMjowOToyMQAAAGgAcAAAAP/hBBVodHRwOi8vbnMuYWRvYmUuY29tL3hhcC8xLjAvADw/eHBhY2tldCBiZWdpbj0n77u/JyBpZD0nVzVNME1wQ2VoaUh6cmVTek5UY3prYzlkJz8+DQo8eDp4bXBtZXRhIHhtbG5zOng9ImFkb2JlOm5zOm1ldGEvIj48cmRmOlJERiB4bWxuczpyZGY9Imh0dHA6Ly93d3cudzMub3JnLzE5OTkvMDIvMjItcmRmLXN5bnRheC1ucyMiPjxyZGY6RGVzY3JpcHRpb24gcmRmOmFib3V0PSJ1dWlkOmZhZjViZGQ1LWJhM2QtMTFkYS1hZDMxLWQzM2Q3NTE4MmYxYiIgeG1sbnM6ZGM9Imh0dHA6Ly9wdXJsLm9yZy9kYy9lbGVtZW50cy8xLjEvIi8+PHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9InV1aWQ6ZmFmNWJkZDUtYmEzZC0xMWRhLWFkMzEtZDMzZDc1MTgyZjFiIiB4bWxuczp4bXA9Imh0dHA6Ly9ucy5hZG9iZS5jb20veGFwLzEuMC8iPjx4bXA6Q3JlYXRlRGF0ZT4yMDI2LTAyLTEzVDEyOjA5OjIxLjgwMTwveG1wOkNyZWF0ZURhdGU+PC9yZGY6RGVzY3JpcHRpb24+PHJkZjpEZXNjcmlwdGlvbiByZGY6YWJvdXQ9InV1aWQ6ZmFmNWJkZDUtYmEzZC0xMWRhLWFkMzEtZDMzZDc1MTgyZjFiIiB4bWxuczpkYz0iaHR0cDovL3B1cmwub3JnL2RjL2VsZW1lbnRzLzEuMS8iPjxkYzpjcmVhdG9yPjxyZGY6U2VxIHhtbG5zOnJkZj0iaHR0cDovL3d3dy53My5vcmcvMTk5OS8wMi8yMi1yZGYtc3ludGF4LW5zIyI+PHJkZjpsaT5ocDwvcmRmOmxpPjwvcmRmOlNlcT4NCgkJCTwvZGM6Y3JlYXRvcj48L3JkZjpEZXNjcmlwdGlvbj48L3JkZjpSREY+PC94OnhtcG1ldGE+DQogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgPD94cGFja2V0IGVuZD0ndyc/Pv/bAEMABwUFBgUE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'; // sabit form logosu (Excel çıktısında kullanılır)
@@ -476,6 +477,7 @@ function topbarHtml(){
 async function bootWorkshop(){
   await loadOrdersForSeller();
   await loadMyProducts();
+  await loadMyCustomers();
   renderWorkshop();
 }
 
@@ -725,6 +727,10 @@ function renderWorkshop(){
           <button class="btn btn-sm" id="mc_create">Hesap oluştur</button>
           <span class="hint" id="mc_status"></span>
         </div>
+        <div style="margin-top:14px; border-top:1px solid var(--border); padding-top:10px;">
+          <div class="hint" style="display:block; margin-bottom:6px; font-weight:600;">Açtığın müşteri hesapları</div>
+          <div id="mc_list"></div>
+        </div>
       </div>
     </details>
     <div class="stat-strip" id="statStrip"></div>
@@ -866,6 +872,7 @@ function renderWorkshop(){
   renderCatalogSection();
   document.getElementById('s_save').onclick = saveCompanyInfo;
   document.getElementById('mc_create').onclick = createCustomerAccount;
+  renderMyCustomersList();
   initSeg('w_temper');
   initSeg('w_edge');
   initSeg('w_renk');
@@ -960,9 +967,29 @@ async function createCustomerAccount(){
     document.getElementById('mc_name').value = '';
     statusEl.style.color = 'var(--primary)';
     statusEl.textContent = `Hesap oluşturuldu ✓ Kullanıcı adı: ${data.username}`;
+    await loadMyCustomers();
+    renderMyCustomersList();
   } catch(err){
     statusEl.textContent = 'Bağlantı hatası: ' + err.message;
   }
+}
+
+// Satıcının kendi açtığı müşteri hesaplarının listesi — kullanıcı adını
+// unutursa/kimin hangi hesap olduğunu görmesi için.
+async function loadMyCustomers(){
+  const {data, error} = await sb.from('profiles').select('id, username, full_name').eq('seller_id', profile.id).eq('role', 'musteri').order('full_name', {ascending:true});
+  myCustomers = error ? [] : data;
+}
+function renderMyCustomersList(){
+  const el = document.getElementById('mc_list');
+  if(!el) return;
+  el.innerHTML = myCustomers.length===0
+    ? `<div class="hint">Henüz müşteri hesabı açmadın.</div>`
+    : myCustomers.map(c=>`
+      <div style="display:flex; align-items:center; gap:10px; padding:6px 0; border-bottom:1px solid var(--border); font-size:13px;">
+        <span style="flex:1;">${c.full_name}</span>
+        <span style="font-family:var(--font-mono); color:var(--text-dim); font-size:12px;">${c.username}</span>
+      </div>`).join('');
 }
 
 async function submitWorkshopOrder(){
@@ -1010,12 +1037,29 @@ async function submitWorkshopOrder(){
 /* =========================================================
    CUSTOMER (MÜŞTERİ) VIEW
    ========================================================= */
+// Müşteri hesabı artık satıcı tarafından açılıyor ve o satıcıya sabitleniyor
+// (profiles.seller_id) — bu yüzden normalde atölye seçim listesine hiç gerek
+// yok, hesabı kim açtıysa müşteri onun müşterisi. Eski/atanmamış (seller_id
+// boş) hesaplar için geriye dönük uyumluluk amacıyla eski dropdown davranışı
+// (tüm satıcıları listele) hâlâ yedekte duruyor.
 async function bootCustomer(){
-  const {data:sellerList} = await sb.from('profiles').select('id, workshop_name, full_name').eq('role','satici');
-  sellers = sellerList || [];
-  if(sellers.length){ await loadProductsForSellerId(sellers[0].id); }
+  if(profile.seller_id){
+    sellers = [{id: profile.seller_id}];
+    await loadProductsForSellerId(profile.seller_id);
+  } else {
+    const {data:sellerList} = await sb.from('profiles').select('id, workshop_name, full_name').eq('role','satici');
+    sellers = sellerList || [];
+    if(sellers.length){ await loadProductsForSellerId(sellers[0].id); }
+  }
   await loadOrdersForCustomer();
   renderCustomer();
+}
+// Müşterinin sipariş vereceği satıcının id'si — sabit atanmışsa direkt profile'dan,
+// yoksa (eski hesaplar) ekrandaki dropdown'dan okunur.
+function customerSellerId(){
+  if(profile.seller_id) return profile.seller_id;
+  const sel = document.getElementById('c_seller');
+  return sel ? sel.value : '';
 }
 
 async function loadOrdersForCustomer(){
@@ -1028,12 +1072,13 @@ function renderCustomer(){
     ${topbarHtml()}
     <div class="section-eyebrow">Yeni ölçü bildirimi</div>
     <div class="pane form-card">
+      ${profile.seller_id ? '' : `
       <div class="field" style="margin-bottom:12px;">
         <label for="c_seller">Atölye seçin</label>
         <select id="c_seller">
           ${sellers.length ? sellers.map(s=>`<option value="${s.id}">${s.workshop_name||s.full_name}</option>`).join('') : '<option value="">Henüz kayıtlı atölye yok</option>'}
         </select>
-      </div>
+      </div>`}
       <div class="field" style="margin-bottom:12px;"><label for="c_custname">Müşteri adı</label><input id="c_custname" type="text" placeholder="Bu sipariş kimin adına? (boş bırakırsan kendi adın kullanılır)"></div>
       <div class="field" style="margin-bottom:12px;"><label for="c_addr">Adres</label><input id="c_addr" type="text" placeholder="Teslimat adresiniz"></div>
       <div class="field-grid three">
@@ -1152,7 +1197,7 @@ function renderCustomer(){
 async function submitCustomerOrder(){
   const statusEl = document.getElementById('c_status');
   const linesClean = lineState.filter(l=>l.w && l.h && l.qty);
-  const sellerId = document.getElementById('c_seller').value;
+  const sellerId = customerSellerId();
   if(!sellerId){ statusEl.textContent = 'Lütfen bir atölye seçin.'; return; }
   if(linesClean.length===0){ statusEl.textContent = 'En az bir ölçü girin.'; return; }
   const prod = selectedProduct('c');
