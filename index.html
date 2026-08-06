@@ -259,13 +259,24 @@ function sbCheckRow(data, error, aciklama){
 const STATUSES = [
   {label:'Sipariş alındı', short:'Alındı'},
   {label:'Ölçü onaylandı', short:'Onaylı'},
-  {label:'Kesimde', short:'Kesim'},
+  {label:'Üretimde', short:'Üretim'},
   {label:'Kalite kontrol', short:'Kalite'},
   {label:'Teslimata hazır', short:'Hazır'}
 ];
-const DELIVERED_INDEX = STATUSES.length; // 5 — "Teslim edildi", ayrı arşiv olarak tutulur
-const DELIVERED_LABEL = 'Teslim edildi';
+const DELIVERED_INDEX = STATUSES.length; // 5 — "Sevk edildi", ayrı arşiv olarak tutulur
+const DELIVERED_LABEL = 'Sevk edildi';
 function statusLabel(i){ return i===DELIVERED_INDEX ? DELIVERED_LABEL : STATUSES[i].label; }
+// "Üretimde" (status===URETIM_INDEX) durumundayken tek tek, sırasız işaretlenen
+// üretim adımları — atölyede bunlar sabit bir sırada ilerlemiyor (bazen önce temper,
+// bazen önce işlemde bitiyor), o yüzden tek bir "adım numarası" değil, birbirinden
+// bağımsız 4 kutucuk (orders.uretim_adimlari jsonb: {kesim,rodaj,temper,islemde}).
+const URETIM_INDEX = 2;
+const URETIM_ADIMLARI = [
+  {key:'kesim', label:'Kesim'},
+  {key:'rodaj', label:'Rödaj'},
+  {key:'temper', label:'Temper'},
+  {key:'islemde', label:'İşlemde'}
+];
 let showDelivered = false;
 
 let session = null;
@@ -308,7 +319,7 @@ const DEFAULT_CATALOG = [
 
 const app = document.getElementById('app');
 
-function fmtM2(n){ return n.toLocaleString('tr-TR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' m²'; }
+function fmtM2(n){ return n.toLocaleString('tr-TR', {minimumFractionDigits:3, maximumFractionDigits:3}) + ' m²'; }
 
 // Not metnini HTML'e güvenle basar, içindeki http(s) linkleri (müşterinin eklediği
 // Excel/foto ek dosyaları gibi) tıklanabilir hale getirir.
@@ -317,7 +328,13 @@ function linkifyNote(text){
   const esc = String(text).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>');
   return esc.replace(/(https?:\/\/[^\s<]+)/g, url=>`<a href="${url}" target="_blank" rel="noopener">🔗 dosyayı aç</a>`);
 }
-function lineM2(l){ return ((parseFloat(l.w)||0) * (parseFloat(l.h)||0) / 1000000) * (parseInt(l.qty)||0); }
+// Atölyenin gerçek kuralı: m² 3 ondalığa yuvarlanır (örn. 2,18418 → 2,184), fiyat
+// hesabı da (aşağıdaki Excel export'ta) bu yuvarlanmış değer üzerinden yapılır —
+// yuvarlanmamış tam değer kullanılırsa fiyat gerçekte olduğundan az da olsa fazla çıkıyordu.
+function lineM2(l){
+  const m2 = ((parseFloat(l.w)||0) * (parseFloat(l.h)||0) / 1000000) * (parseInt(l.qty)||0);
+  return Math.round(m2*1000)/1000;
+}
 function linesTotalM2(lines){ return lines.reduce((s,l)=>s+lineM2(l), 0); }
 function fmtDate(d){
   if(!d) return 'Belirtilmedi';
@@ -3372,6 +3389,18 @@ function renderThicknessFilters(){
   });
 }
 
+// Üretimde durumundaki bir siparişin 4 adımından kaçının işaretlendiğini gösteren
+// sırasız kutucuk satırı — sadece satıcı görünümünde ve o an "Üretimde" ise basılır.
+function uretimAdimlariHtml(o){
+  return `<div class="uretim-adimlari" style="display:flex; gap:6px; flex-wrap:wrap; margin-top:8px;">
+    ${URETIM_ADIMLARI.map(a=>{
+      const done = !!(o.uretim_adimlari && o.uretim_adimlari[a.key]);
+      return `<label class="uretim-adim-chip" style="font-size:11px; font-weight:600; padding:4px 10px; border-radius:var(--radius-pill); border:1px solid ${done?'var(--primary)':'var(--border)'}; background:${done?'#E7F8EE':'var(--surface)'}; color:${done?'var(--primary)':'var(--text-mut)'}; cursor:pointer; display:inline-flex; align-items:center; gap:4px; user-select:none;">
+        <input type="checkbox" class="uretimAdimCheck" data-id="${o.id}" data-key="${a.key}" ${done?'checked':''} style="margin:0; width:12px; height:12px; accent-color:var(--primary);">${a.label}
+      </label>`;
+    }).join('')}
+  </div>`;
+}
 function orderCardHtml(o, isSellerView, isDelivered){
   const pct = isDelivered ? 100 : (o.status/(STATUSES.length-1))*100;
   const total = linesTotalM2(o.lines||[]);
@@ -3389,7 +3418,7 @@ function orderCardHtml(o, isSellerView, isDelivered){
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5" stroke="#9CA3AF"/><text x="7" y="9.5" font-size="5.5" text-anchor="middle" fill="#9CA3AF" font-family="Arial" font-weight="bold">ASC</text></svg>
         </button>
         <button class="btn btn-ghost etiketBtn" data-id="${o.id}" title="Etiket yazdır">🏷️</button>
-        <button class="btn btn-ghost btn-sm undoDeliverBtn" data-id="${o.id}" title="Teslim edildi işaretini geri al">Geri al</button>
+        <button class="btn btn-ghost btn-sm undoDeliverBtn" data-id="${o.id}" title="Sevk edildi işaretini geri al">Geri al</button>
       </div>`;
     } else {
       actionsHtml = `
@@ -3403,7 +3432,7 @@ function orderCardHtml(o, isSellerView, isDelivered){
         <button class="btn btn-ghost etiketBtn" data-id="${o.id}" title="Etiket yazdır">🏷️</button>
         ${o.status===0 ? `<button class="btn btn-ghost editBtn" data-id="${o.id}" title="Siparişi düzenle">✏️</button><button class="btn btn-ghost deleteBtn" data-id="${o.id}" title="Siparişi sil">🗑️</button>` : ''}
         <button class="btn btn-ghost prevBtn" data-id="${o.id}" ${o.status===0?'disabled':''}>‹</button>
-        <button class="btn btn-primary nextBtn" data-id="${o.id}">${o.status===STATUSES.length-1?'Teslim edildi ✓':'İlerlet ›'}</button>
+        <button class="btn btn-primary nextBtn" data-id="${o.id}">${o.status===STATUSES.length-1?'Sevk edildi ✓':'İlerlet ›'}</button>
       </div>`;
     }
   } else if(o.status===0){
@@ -3427,6 +3456,7 @@ function orderCardHtml(o, isSellerView, isDelivered){
         ${o.note?`<div class="order-note">${linkifyNote(o.note)}</div>`:''}
         ${o.cust_address?`<div class="order-note">📍 ${o.cust_address}</div>`:''}
         <div class="progress-track"><div class="progress-fill" style="width:${pct}%;"></div></div>
+        ${(isSellerView && !isDelivered && o.status===URETIM_INDEX) ? uretimAdimlariHtml(o) : ''}
       </div>
       <div class="order-due"><svg width="12" height="12" viewBox="0 0 12 12" fill="none"><rect x="1.5" y="2.5" width="9" height="8" rx="1" stroke="#9CA3AF"/><path d="M1.5 5 H10.5 M4 1.5V3.5M8 1.5V3.5" stroke="#9CA3AF"/></svg>${fmtDate(o.due)}</div>
       <span class="status-pill ${pillClass}">${pillLabel}</span>
@@ -3518,19 +3548,32 @@ function renderList(isSellerView){
         }
       };
     });
+    // Üretimde durumundaki sırasız adım kutucukları — hangi sırayla işaretlenirse
+    // işaretlensin, sadece o adımın kendi bayrağını (true/false) günceller.
+    el.querySelectorAll('.uretimAdimCheck').forEach(cb=>{
+      cb.onchange = async ()=>{
+        const o = orders.find(x=>String(x.id)===cb.dataset.id);
+        if(!o) return;
+        const yeni = Object.assign({}, o.uretim_adimlari||{});
+        yeni[cb.dataset.key] = cb.checked;
+        const {data, error} = await sb.from('orders').update({uretim_adimlari: yeni}).eq('id', o.id).select();
+        if(sbCheckRow(data, error, 'Üretim adımı güncellenemedi.')) return;
+        await loadOrdersForSeller(); renderList(true);
+      };
+    });
   }
 
-  // Teslim edilenler — ayrı arşiv bölümü
+  // Sevk edilenler — ayrı arşiv bölümü
   const archEl = document.getElementById('deliveredSection');
   if(archEl){
     archEl.innerHTML = `
       <div class="list-head" style="margin-top:26px;">
-        <div class="section-eyebrow" style="margin-bottom:0;">Teslim edilenler <span class="hint">(${deliveredOrders.length})</span></div>
+        <div class="section-eyebrow" style="margin-bottom:0;">Sevk edilenler <span class="hint">(${deliveredOrders.length})</span></div>
         ${deliveredOrders.length>0 ? `<button class="btn btn-ghost btn-sm" id="toggleDeliveredBtn">${showDelivered?'Gizle':'Göster'}</button>` : ''}
       </div>
       <div id="deliveredList" style="${showDelivered?'':'display:none;'}">
         ${deliveredOrders.length===0
-          ? `<div class="pane empty-state"><div style="font-size:13px;">Henüz teslim edilmiş sipariş yok.</div></div>`
+          ? `<div class="pane empty-state"><div style="font-size:13px;">Henüz sevk edilmiş sipariş yok.</div></div>`
           : deliveredOrders.map(o=>orderCardHtml(o, isSellerView, true)).join('')}
       </div>
     `;
@@ -3904,8 +3947,7 @@ function drawOrderExcelBlock(wb, ws, o, base, delikSablonAnchors){
   // Veri satırları (siparişin ölçü/kalem listesi) — No | Genişlik | Yükseklik | Adet | m2 | Cam Rengi | Cam Özelliği | Delik/Poz
   rowPlan.rows.forEach(({row:r, line:l, no})=>{
     const qty = parseInt(l.qty)||0, w = parseFloat(l.w)||0, h = parseFloat(l.h)||0;
-    const tekM2 = (w*h)/1000000;
-    const satirM2 = tekM2*qty;
+    const satirM2 = lineM2(l); // atölyenin 3 ondalık yuvarlama kuralıyla birebir
     toplamAdet += qty; toplamM2 += satirM2;
     // Delik/Poz: kullanıcı bu kutuya ne yazdıysa direkt yazılır; hiçbir şey yazmadıysa
     // ama delik kroki eklendiyse yedek olarak "Delik" yazılır.
@@ -3920,17 +3962,19 @@ function drawOrderExcelBlock(wb, ws, o, base, delikSablonAnchors){
       styleCell(cell, {font: isNum ? FONT_TBL_N : FONT_TBL, align: isNum ? {h:'center'} : {h:'left', wrap:true}});
       cell.value = val;
     });
-    // E = m2 (adet × tek parça m²'si) — Excel'de ölçü değişirse otomatik güncellensin diye formül olarak yazılıyor
-    styleCell(ws.getCell(`E${r}`), {font:FONT_TBL_N, align:{h:'center'}, numFmt:'0.00'});
-    ws.getCell(`E${r}`).value = {formula:`(B${r}*C${r}*D${r})/1000000`, result: Number(satirM2.toFixed(4))};
+    // E = m2 (adet × tek parça m²'si) — Excel'de ölçü değişirse otomatik güncellensin diye
+    // formül olarak yazılıyor; ROUND(...,3) atölyenin 3 ondalık yuvarlama kuralını Excel
+    // tarafında da korur (kullanıcı ölçüyü Excel'de değiştirirse bile fiyatla tutarlı kalır).
+    styleCell(ws.getCell(`E${r}`), {font:FONT_TBL_N, align:{h:'center'}, numFmt:'0.000'});
+    ws.getCell(`E${r}`).value = {formula:`ROUND((B${r}*C${r}*D${r})/1000000,3)`, result: satirM2};
   });
 
   // GENEL TOPLAM satırı — toplam adet ve toplam m² doğrudan hesaplanmış değer olarak yazılıyor
   ws.mergeCells(`A${totalRow}:D${totalRow}`);
   styleCell(ws.getCell(`A${totalRow}`), {font:FONT_TBL_N, fill:GRAY_FILL, align:{h:'center'}});
   ws.getCell(`A${totalRow}`).value = {formula:`"Toplam "&SUM(D${firstRow}:D${lastDataRow})&" Adet"`, result: `Toplam ${toplamAdet} Adet`};
-  styleCell(ws.getCell(`E${totalRow}`), {font:FONT_TBL_N, fill:GRAY_FILL, align:{h:'center'}, numFmt:'0.00 "m²"'});
-  ws.getCell(`E${totalRow}`).value = {formula:`SUM(E${firstRow}:E${lastDataRow})`, result: Number(toplamM2.toFixed(4))};
+  styleCell(ws.getCell(`E${totalRow}`), {font:FONT_TBL_N, fill:GRAY_FILL, align:{h:'center'}, numFmt:'0.000 "m²"'});
+  ws.getCell(`E${totalRow}`).value = {formula:`SUM(E${firstRow}:E${lastDataRow})`, result: Number(toplamM2.toFixed(3))};
   ['F','G','H'].forEach(col=>styleCell(ws.getCell(`${col}${totalRow}`), {font:FONT_TBL_N, fill:GRAY_FILL}));
 
   // Delik Bölümü — sadece kroki eklenmiş satırlar için, tablonun altına ayrı bir bölüm olarak (sadece şema, ekstra ölçü yazısı yok)
@@ -3971,16 +4015,17 @@ function drawOrderExcelBlock(wb, ws, o, base, delikSablonAnchors){
     let genelTutar = 0;
     lines.forEach((l,i)=>{
       const r = rowByIdx[i]; // Boy'a göre gruplanmış gerçek satır (blok başlangıcından basit ofset değil)
-      const qty = parseInt(l.qty)||0, w = parseFloat(l.w)||0, h = parseFloat(l.h)||0;
-      const m2 = (w*h*qty)/1000000;
+      // m² atölyenin 3 ondalık yuvarlama kuralıyla (lineM2) hesaplanır — Fiyat bu
+      // yuvarlanmış değerle çarpılır, tam (yuvarlanmamış) değerle değil. Örnek:
+      // 617×1770mm × 2 adet = 2,18418 m² → yuvarlanır 2,184 m² → ×1310 TL = 2.861,04 TL.
+      // Yuvarlanmamış tam değer kullanılsaydı 2.861,28 TL çıkardı — atölyenin elle
+      // hesapladığından fazla, kul hakkı geçecek bir fark.
+      const m2 = lineM2(l);
       const fiyat = parseFloat(l.fiyat)||0;
       const tutar = m2*fiyat;
       genelTutar += tutar;
       styleCell(ws.getCell(`K${r}`), {font:FONT_TBL_N, align:{h:'center'}, border:false, numFmt:'#,##0.00'});
       ws.getCell(`K${r}`).value = fiyat;
-      // Tutar tam hassasiyetle (yuvarlamadan) yazılıyor — yukarıya abartılı yuvarlama
-      // yüzünden fiyat gerçekte olduğundan fazla görünmesin diye. numFmt sadece
-      // görünümü 2 ondalığa indiriyor, saklanan değer tam kalıyor.
       styleCell(ws.getCell(`L${r}`), {font:FONT_TBL_N, align:{h:'center'}, border:false, numFmt:'#,##0.00'});
       ws.getCell(`L${r}`).value = tutar;
     });
