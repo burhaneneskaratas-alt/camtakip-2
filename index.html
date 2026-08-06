@@ -283,7 +283,6 @@ let showDelivered = false;
 let session = null;
 let profile = null;   // {id, full_name, role, workshop_name}
 let orders = [];
-let sellers = [];      // müşteri görünümünde seçilecek satıcı/atölye listesi
 let activeFilter = 'all';
 let thicknessFilter = 'all';
 let searchQuery = '';
@@ -1038,29 +1037,23 @@ async function submitWorkshopOrder(){
    CUSTOMER (MÜŞTERİ) VIEW
    ========================================================= */
 // Müşteri hesabı artık satıcı tarafından açılıyor ve o satıcıya sabitleniyor
-// (profiles.seller_id) — bu yüzden normalde atölye seçim listesine hiç gerek
-// yok, hesabı kim açtıysa müşteri onun müşterisi. Eski/atanmamış (seller_id
-// boş) hesaplar için geriye dönük uyumluluk amacıyla eski dropdown davranışı
-// (tüm satıcıları listele) hâlâ yedekte duruyor.
+// (profiles.seller_id) — ekranda atölye seçimi diye bir şey ARTIK HİÇ
+// GÖSTERİLMİYOR. Eski/atanmamış (seller_id boş) hesaplar için de dropdown
+// göstermek yerine sessizce ilk kayıtlı satıcıya bağlanılıyor — kullanıcıya
+// hiçbir seçim ekranı çıkmıyor, tek satıcı varmış gibi davranıyor.
 async function bootCustomer(){
   if(profile.seller_id){
-    sellers = [{id: profile.seller_id}];
-    await loadProductsForSellerId(profile.seller_id);
+    myFixedSellerId = profile.seller_id;
   } else {
-    const {data:sellerList} = await sb.from('profiles').select('id, workshop_name, full_name').eq('role','satici');
-    sellers = sellerList || [];
-    if(sellers.length){ await loadProductsForSellerId(sellers[0].id); }
+    const {data:sellerList} = await sb.from('profiles').select('id').eq('role','satici').limit(1);
+    myFixedSellerId = (sellerList && sellerList[0]) ? sellerList[0].id : null;
   }
+  if(myFixedSellerId) await loadProductsForSellerId(myFixedSellerId);
   await loadOrdersForCustomer();
   renderCustomer();
 }
-// Müşterinin sipariş vereceği satıcının id'si — sabit atanmışsa direkt profile'dan,
-// yoksa (eski hesaplar) ekrandaki dropdown'dan okunur.
-function customerSellerId(){
-  if(profile.seller_id) return profile.seller_id;
-  const sel = document.getElementById('c_seller');
-  return sel ? sel.value : '';
-}
+let myFixedSellerId = null; // müşterinin bağlı olduğu tek atölye — ekranda hiç seçim yok
+function customerSellerId(){ return myFixedSellerId || ''; }
 
 async function loadOrdersForCustomer(){
   const {data, error} = await sb.from('orders').select('*').eq('customer_id', profile.id).is('deleted_at', null).order('created_at', {ascending:false});
@@ -1072,13 +1065,6 @@ function renderCustomer(){
     ${topbarHtml()}
     <div class="section-eyebrow">Yeni ölçü bildirimi</div>
     <div class="pane form-card">
-      ${profile.seller_id ? '' : `
-      <div class="field" style="margin-bottom:12px;">
-        <label for="c_seller">Atölye seçin</label>
-        <select id="c_seller">
-          ${sellers.length ? sellers.map(s=>`<option value="${s.id}">${s.workshop_name||s.full_name}</option>`).join('') : '<option value="">Henüz kayıtlı atölye yok</option>'}
-        </select>
-      </div>`}
       <div class="field" style="margin-bottom:12px;"><label for="c_custname">Müşteri adı</label><input id="c_custname" type="text" placeholder="Bu sipariş kimin adına? (boş bırakırsan kendi adın kullanılır)"></div>
       <div class="field" style="margin-bottom:12px;"><label for="c_addr">Adres</label><input id="c_addr" type="text" placeholder="Teslimat adresiniz"></div>
       <div class="field-grid three">
@@ -1142,7 +1128,7 @@ function renderCustomer(){
         <div class="hint" id="c_attach_status" style="margin-top:4px;"></div>
       </div>
       <div class="form-actions">
-        <button class="btn btn-primary" id="c_submit" ${sellers.length?'':'disabled'}>Ölçüyü gönder</button>
+        <button class="btn btn-primary" id="c_submit" ${myFixedSellerId?'':'disabled'}>Ölçüyü gönder</button>
         <button class="btn btn-ghost btn-sm" id="c_cancelEdit" style="display:none;">Düzenlemeyi iptal et</button>
         <span class="hint" id="c_status"></span>
       </div>
@@ -1156,13 +1142,6 @@ function renderCustomer(){
   initSeg('c_edge');
   initSeg('c_renk');
   setupOrderProductSelects('c');
-  const sellerSel = document.getElementById('c_seller');
-  if(sellerSel){
-    sellerSel.onchange = async ()=>{
-      await loadProductsForSellerId(sellerSel.value);
-      setupOrderProductSelects('c');
-    };
-  }
   lineState = []; addLine();
   document.getElementById('c_addLine').onclick = addLine;
   document.getElementById('c_mrBtn').onclick = ()=> openMeasureReader('lines','c');
@@ -1291,9 +1270,6 @@ function openEditOrder(o, isSellerView){
   if(isSellerView){
     const bayiEl = document.getElementById('w_bayi'); if(bayiEl) bayiEl.value = o.bayi_adi || '';
     const dueEl = document.getElementById('w_due'); if(dueEl) dueEl.value = o.due || '';
-  } else {
-    const sellerSel = document.getElementById('c_seller');
-    if(sellerSel && o.seller_id) sellerSel.value = o.seller_id;
   }
   const custEl = document.getElementById(prefix+(isSellerView?'_cust':'_custname'));
   if(custEl) custEl.value = o.cust_name || '';
