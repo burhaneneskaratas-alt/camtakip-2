@@ -766,10 +766,6 @@ function renderWorkshop(){
       <div class="field" style="margin-bottom:12px;">
         <label>Cam rengi</label>
         <div class="seg" data-group="w_renk"><button data-val="Füme" class="active">Füme</button><button data-val="Şeffaf">Şeffaf</button><button data-val="Mavi">Mavi</button><button data-val="Yeşil">Yeşil</button><button data-val="Kumlama">Kumlama</button><button data-val="Karolaj">Karolaj</button></div>
-        <div class="field" id="w_desenField" style="display:none; margin-top:8px;">
-          <label for="w_desenSelect">Desen</label>
-          <select id="w_desenSelect"></select>
-        </div>
       </div>
       <div class="field" id="w_isicam_wrap" style="margin-bottom:12px; display:none;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -879,7 +875,6 @@ function renderWorkshop(){
   initSeg('w_temper');
   initSeg('w_edge');
   initSeg('w_renk');
-  wireRenkDesen('w');
   setupOrderProductSelects('w');
   lineState = []; addLine();
   document.getElementById('w_addLine').onclick = addLine;
@@ -1013,7 +1008,7 @@ async function submitWorkshopOrder(){
     temper: segVal('w_temper'), edge: segVal('w_edge'),
     renk: document.getElementById('w_isicam').checked
       ? buildIsicamText('w')
-      : finalRenkValue('w'),
+      : segVal('w_renk'),
     lines: linesClean.map(l=>({w:parseFloat(l.w), h:parseFloat(l.h), qty:parseInt(l.qty), note:l.note||'', dm:l.dm||[], delikSablon:l.delikSablon||null, sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:l.isicam||{}, fiyat:document.getElementById('w_fiyat').value||''})),
     note: document.getElementById('w_note').value,
     asc_customer_code: document.getElementById('w_asc_code').value.trim() || null,
@@ -1093,10 +1088,6 @@ function renderCustomer(){
       <div class="field" style="margin-bottom:12px;">
         <label>Cam rengi</label>
         <div class="seg" data-group="c_renk"><button data-val="Füme" class="active">Füme</button><button data-val="Şeffaf">Şeffaf</button><button data-val="Mavi">Mavi</button><button data-val="Yeşil">Yeşil</button><button data-val="Kumlama">Kumlama</button><button data-val="Karolaj">Karolaj</button></div>
-        <div class="field" id="c_desenField" style="display:none; margin-top:8px;">
-          <label for="c_desenSelect">Desen</label>
-          <select id="c_desenSelect"></select>
-        </div>
       </div>
       <div class="field" id="c_isicam_wrap" style="margin-bottom:12px; display:none;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -1150,7 +1141,6 @@ function renderCustomer(){
   initSeg('c_temper');
   initSeg('c_edge');
   initSeg('c_renk');
-  wireRenkDesen('c');
   setupOrderProductSelects('c');
   lineState = []; addLine();
   document.getElementById('c_addLine').onclick = addLine;
@@ -1228,7 +1218,7 @@ async function submitCustomerOrder(){
     temper: segVal('c_temper'), edge: segVal('c_edge'),
     renk: document.getElementById('c_isicam').checked
       ? buildIsicamText('c')
-      : finalRenkValue('c'),
+      : segVal('c_renk'),
     lines: linesClean.map(l=>({w:parseFloat(l.w), h:parseFloat(l.h), qty:parseInt(l.qty), note:l.note||'', dm:l.dm||[], delikSablon:l.delikSablon||null, sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:l.isicam||{}, fiyat:l.fiyat||''})),
     note: noteVal, due: existing ? existing.due : null, status:0
   };
@@ -1264,41 +1254,6 @@ function initSeg(group){
 function segVal(group){
   const a = document.querySelector(`.seg[data-group="${group}"] button.active`);
   return a ? a.dataset.val : '';
-}
-// Kumlama/Karolaj renk seçildiğinde çıkan "Desen" kutusu — Kumlama'da K-01..K-20,
-// Karolaj'da K-21/K-22. prefix: 'w' (satıcı) veya 'c' (müşteri).
-const KUMLAMA_DESENLERI = Array.from({length:20}, (_,i)=> 'K-' + String(i+1).padStart(2,'0'));
-const KAROLAJ_DESENLERI = ['K-21', 'K-22'];
-function updateDesenField(prefix){
-  const field = document.getElementById(prefix+'_desenField');
-  const select = document.getElementById(prefix+'_desenSelect');
-  if(!field || !select) return;
-  const renk = segVal(prefix+'_renk');
-  const list = renk==='Kumlama' ? KUMLAMA_DESENLERI : renk==='Karolaj' ? KAROLAJ_DESENLERI : null;
-  if(list){
-    const eskiVal = select.value;
-    select.innerHTML = list.map(d=>`<option value="${d}">${d}</option>`).join('');
-    if(list.includes(eskiVal)) select.value = eskiVal;
-    field.style.display = '';
-  } else {
-    field.style.display = 'none';
-  }
-}
-function wireRenkDesen(prefix){
-  document.querySelectorAll(`.seg[data-group="${prefix}_renk"] button`).forEach(b=>{
-    b.addEventListener('click', ()=> updateDesenField(prefix));
-  });
-  updateDesenField(prefix);
-}
-// Kaydedilecek nihai "renk" metni — Kumlama/Karolaj seçiliyse desen kodu da eklenir
-// (örn. "Kumlama K-05"), diğer renklerde (Füme, Şeffaf...) sadece renk adı.
-function finalRenkValue(prefix){
-  const renk = segVal(prefix+'_renk');
-  if(renk==='Kumlama' || renk==='Karolaj'){
-    const sel = document.getElementById(prefix+'_desenSelect');
-    return sel && sel.value ? `${renk} ${sel.value}` : renk;
-  }
-  return renk;
 }
 function setSegVal(group, val){
   document.querySelectorAll(`.seg[data-group="${group}"] button`).forEach(b=>{
@@ -1367,16 +1322,7 @@ function openEditOrder(o, isSellerView){
   } else {
     if(isicamChk) isicamChk.checked = false;
     if(isicamDetail) isicamDetail.style.display = 'none';
-    // Kumlama/Karolaj ise renk metni "Kumlama K-05" gibi desen koduyla birlikte
-    // kaydedilmiş olabilir — geri açarken renk ve desen'i ayırıp ikisini de kur.
-    const renkRaw = o.renk || 'Füme';
-    const desenMatch = renkRaw.match(/^(Kumlama|Karolaj)\s+(K-\d+)$/);
-    setSegVal(prefix+'_renk', desenMatch ? desenMatch[1] : renkRaw);
-    updateDesenField(prefix);
-    if(desenMatch){
-      const desenSel = document.getElementById(prefix+'_desenSelect');
-      if(desenSel) desenSel.value = desenMatch[2];
-    }
+    setSegVal(prefix+'_renk', o.renk || 'Füme');
   }
 
   // isicam: sadece o satır için ÖZEL OLARAK değiştirilmişse (.renk dolu) donmuş halde
