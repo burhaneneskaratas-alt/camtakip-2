@@ -288,8 +288,9 @@ let orders = [];
 let activeFilter = 'all';
 let thicknessFilter = 'all';
 let searchQuery = '';
-let selectedForBulkDelete = new Set();
-let selectedForBulkKesim = new Set(); // Üretimde'ki siparişleri toplu "Kesildi" işaretlemek için
+// Tek bir seçim kutucuğu, iki farklı toplu işlem (sil / kesildi işaretle) için
+// paylaşılıyor — her buton kendi işlemine uygun olanları seçimin içinden süzer.
+let selectedForBulk = new Set();
 function orderThicknessKey(o){
   if(isOrderIsicam(o)) return 'ISI CAM';
   return parseKalinlik(o.product_label) || 'DİĞER';
@@ -862,8 +863,7 @@ function renderWorkshop(){
   };
   document.getElementById('bulkDeleteBtn').onclick = handleBulkDelete;
   document.getElementById('bulkKesimBtn').onclick = handleBulkKesim;
-  selectedForBulkDelete.clear();
-  selectedForBulkKesim.clear();
+  selectedForBulk.clear();
   document.querySelectorAll('#leftPanelToggle button').forEach(b=>{
     b.onclick = ()=> setLeftPanelTab(b.dataset.val);
   });
@@ -2508,12 +2508,12 @@ function orderCardHtml(o, isSellerView, isDelivered){
         <button class="btn btn-ghost deleteBtn" data-id="${o.id}" title="Siparişi sil">🗑️ Sil</button>
       </div>`;
   }
-  const showBulkCheck = isSellerView && !isDelivered && o.status===0;
-  const showBulkKesimCheck = isSellerView && !isDelivered && !kesimTamamlandiMi(o);
+  // Tek kutucuk: sil (sadece Alındı) ve/veya kesildi işaretle (kesim yapılmamış her sipariş)
+  // için ortak seçim — hangi işlemin geçerli olduğuna butonlar kendi tıklanınca karar verir.
+  const showBulkCheck = isSellerView && !isDelivered && (o.status===0 || !kesimTamamlandiMi(o));
   return `
     <div class="pane order-card" data-id="${o.id}">
-      ${showBulkCheck ? `<input type="checkbox" class="orderBulkDelCheck" data-id="${o.id}" title="Toplu silmek için seç" ${selectedForBulkDelete.has(String(o.id))?'checked':''} style="position:absolute; top:10px; left:10px; width:16px; height:16px; accent-color:var(--accent); cursor:pointer; z-index:2;">` : ''}
-      ${showBulkKesimCheck ? `<input type="checkbox" class="orderBulkKesimCheck" data-id="${o.id}" title="Toplu 'Kesildi' işaretlemek için seç" ${selectedForBulkKesim.has(String(o.id))?'checked':''} style="position:absolute; top:10px; left:${showBulkCheck?'34px':'10px'}; width:16px; height:16px; accent-color:var(--primary); cursor:pointer; z-index:2;">` : ''}
+      ${showBulkCheck ? `<input type="checkbox" class="orderBulkCheck" data-id="${o.id}" title="Toplu işlem için seç" ${selectedForBulk.has(String(o.id))?'checked':''} style="position:absolute; top:10px; left:10px; width:16px; height:16px; accent-color:var(--accent); cursor:pointer; z-index:2;">` : ''}
       <div class="order-glyph">${paneGlyph(o.lines)}</div>
       <div class="order-body">
         <div class="order-top"><span class="order-id">#${o.id}</span><span class="order-cust">${o.bayi_adi ? o.bayi_adi + (o.cust_name && o.cust_name!==o.bayi_adi ? ' · 👤 '+o.cust_name : '') : (o.cust_name||'')}</span></div>
@@ -2567,21 +2567,15 @@ function renderList(isSellerView){
     };
   });
 
-  el.querySelectorAll('.orderBulkDelCheck').forEach(c=>{
+  el.querySelectorAll('.orderBulkCheck').forEach(c=>{
     c.onchange = ()=>{
-      if(c.checked) selectedForBulkDelete.add(c.dataset.id);
-      else selectedForBulkDelete.delete(c.dataset.id);
+      if(c.checked) selectedForBulk.add(c.dataset.id);
+      else selectedForBulk.delete(c.dataset.id);
       updateBulkDeleteBar();
-    };
-  });
-  updateBulkDeleteBar();
-  el.querySelectorAll('.orderBulkKesimCheck').forEach(c=>{
-    c.onchange = ()=>{
-      if(c.checked) selectedForBulkKesim.add(c.dataset.id);
-      else selectedForBulkKesim.delete(c.dataset.id);
       updateBulkKesimBar();
     };
   });
+  updateBulkDeleteBar();
   updateBulkKesimBar();
 
   if(isSellerView){
@@ -2692,18 +2686,24 @@ function updateBulkDeleteBar(){
   const btn = document.getElementById('bulkDeleteBtn');
   const countEl = document.getElementById('bulkDeleteCount');
   if(!btn || !countEl) return;
-  const n = selectedForBulkDelete.size;
+  const n = [...selectedForBulk].filter(id=>{
+    const o = orders.find(x=>String(x.id)===String(id));
+    return o && o.status===0;
+  }).length;
   countEl.textContent = n;
   btn.style.display = n>0 ? 'inline-flex' : 'none';
 }
 
 async function handleBulkDelete(){
-  const ids = [...selectedForBulkDelete];
+  const ids = [...selectedForBulk].filter(id=>{
+    const o = orders.find(x=>String(x.id)===String(id));
+    return o && o.status===0;
+  });
   if(ids.length===0) return;
   if(!confirm(`${ids.length} siparişi silmek istediğine emin misin? Silinenler'den geri alabilirsin.`)) return;
   const {data, error} = await sb.from('orders').update({deleted_at: new Date().toISOString()}).in('id', ids).select();
   if(sbCheckRow(data, error, 'Siparişler silinemedi.')) return;
-  selectedForBulkDelete.clear();
+  selectedForBulk.clear();
   await loadOrdersForSeller();
   renderStats(); renderFilters(); renderList(true);
 }
@@ -2712,16 +2712,24 @@ function updateBulkKesimBar(){
   const btn = document.getElementById('bulkKesimBtn');
   const countEl = document.getElementById('bulkKesimCount');
   if(!btn || !countEl) return;
-  const n = selectedForBulkKesim.size;
+  const n = [...selectedForBulk].filter(id=>{
+    const o = orders.find(x=>String(x.id)===String(id));
+    return o && !kesimTamamlandiMi(o);
+  }).length;
   countEl.textContent = n;
   btn.style.display = n>0 ? 'inline-flex' : 'none';
 }
 
-// Üretimde'ki birden fazla siparişi tek seferde "Kesim" olarak işaretler —
-// her siparişin uretim_adimlari'ndaki diğer bayrakları (rodaj/temper/işlemde)
-// koruyarak sadece kesim:true ekliyor, üzerine yazmıyor.
+// Seçilen birden fazla siparişi tek seferde "Kesim" olarak işaretler — her
+// siparişin uretim_adimlari'ndaki diğer bayrakları (rodaj/temper/işlemde)
+// koruyarak sadece kesim:true ekliyor, üzerine yazmıyor. Seçim içinde zaten
+// kesimi işaretlenmiş olanlar varsa (sil için seçilmiş olabilirler) onlar
+// bu işlemden pas geçilir.
 async function handleBulkKesim(){
-  const ids = [...selectedForBulkKesim];
+  const ids = [...selectedForBulk].filter(id=>{
+    const o = orders.find(x=>String(x.id)===String(id));
+    return o && !kesimTamamlandiMi(o);
+  });
   if(ids.length===0) return;
   if(!confirm(`${ids.length} sipariş "Kesildi" olarak işaretlensin mi?`)) return;
   const sonuclar = await Promise.all(ids.map(id=>{
@@ -2730,7 +2738,7 @@ async function handleBulkKesim(){
     return sb.from('orders').update({uretim_adimlari: yeni}).eq('id', id);
   }));
   if(sonuclar.some(r=>r.error)){ alert('Bazı siparişler güncellenemedi, sayfayı yenileyip tekrar dene.'); }
-  selectedForBulkKesim.clear();
+  selectedForBulk.clear();
   await loadOrdersForSeller();
   renderStats(); renderFilters(); renderList(true);
 }
