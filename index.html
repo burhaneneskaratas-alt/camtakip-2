@@ -54,7 +54,7 @@
   .field input, .field select, .field textarea{background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-sm); color:var(--text); padding:10px 12px; font-size:14px; font-family:var(--font-body); outline:none; width:100%;}
   .field textarea{resize:vertical; min-height:38px;}
   .field input:focus, .field select:focus, .field textarea:focus{border-color:var(--accent); background:var(--surface); box-shadow:0 0 0 3px var(--accent-soft);}
-  .seg{display:flex; gap:4px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-pill); padding:4px;}
+  .seg{display:flex; flex-wrap:wrap; gap:4px; background:var(--surface-2); border:1px solid var(--border); border-radius:var(--radius-pill); padding:4px;}
   .step-panel{background:var(--surface); border:1px solid var(--border); border-radius:var(--radius); padding:18px 20px; margin-bottom:14px; box-shadow:var(--shadow);}
   .step-panel h3{font-size:11px; text-transform:uppercase; letter-spacing:.06em; color:var(--accent); margin:0 0 14px; font-weight:800; display:flex; align-items:center; gap:8px;}
   .step-panel h3::before{content:""; width:6px; height:6px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); flex-shrink:0;}
@@ -765,7 +765,7 @@ function renderWorkshop(){
       </div>
       <div class="field" style="margin-bottom:12px;">
         <label>Cam rengi</label>
-        <div class="seg" data-group="w_renk"><button data-val="Füme" class="active">Füme</button><button data-val="Şeffaf">Şeffaf</button><button data-val="Mavi">Mavi</button><button data-val="Yeşil">Yeşil</button></div>
+        <div class="seg" data-group="w_renk"><button data-val="Füme" class="active">Füme</button><button data-val="Şeffaf">Şeffaf</button><button data-val="Mavi">Mavi</button><button data-val="Yeşil">Yeşil</button><button data-val="Kumlama">Kumlama</button><button data-val="Karolaj">Karolaj</button></div>
       </div>
       <div class="field" id="w_isicam_wrap" style="margin-bottom:12px; display:none;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
@@ -1087,7 +1087,7 @@ function renderCustomer(){
       </div>
       <div class="field" style="margin-bottom:12px;">
         <label>Cam rengi</label>
-        <div class="seg" data-group="c_renk"><button data-val="Füme" class="active">Füme</button><button data-val="Şeffaf">Şeffaf</button><button data-val="Mavi">Mavi</button><button data-val="Yeşil">Yeşil</button></div>
+        <div class="seg" data-group="c_renk"><button data-val="Füme" class="active">Füme</button><button data-val="Şeffaf">Şeffaf</button><button data-val="Mavi">Mavi</button><button data-val="Yeşil">Yeşil</button><button data-val="Kumlama">Kumlama</button><button data-val="Karolaj">Karolaj</button></div>
       </div>
       <div class="field" id="c_isicam_wrap" style="margin-bottom:12px; display:none;">
         <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
