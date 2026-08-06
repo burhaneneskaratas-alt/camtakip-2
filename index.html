@@ -287,6 +287,7 @@ let activeFilter = 'all';
 let thicknessFilter = 'all';
 let searchQuery = '';
 let selectedForBulkDelete = new Set();
+let selectedForBulkKesim = new Set(); // Üretimde'ki siparişleri toplu "Kesildi" işaretlemek için
 function orderThicknessKey(o){
   if(isOrderIsicam(o)) return 'ISI CAM';
   return parseKalinlik(o.product_label) || 'DİĞER';
@@ -847,6 +848,7 @@ function renderWorkshop(){
     <div style="display:flex; gap:8px; align-items:center; margin-bottom:14px; flex-wrap:wrap;">
       <input type="text" id="orderSearch" placeholder="🔍 Bayi/müşteri adına göre ara…" style="flex:1; min-width:200px; padding:9px 12px; border:1px solid var(--border); border-radius:var(--radius-sm); background:var(--surface); color:var(--text); font-size:13px; outline:none;">
       <button class="btn btn-ghost btn-sm" id="bulkDeleteBtn" style="display:none; color:var(--danger);">🗑️ Seçilenleri sil (<span id="bulkDeleteCount">0</span>)</button>
+      <button class="btn btn-ghost btn-sm" id="bulkKesimBtn" style="display:none; color:var(--primary);">✂️ Seçilenler kesildi (<span id="bulkKesimCount">0</span>)</button>
     </div>
     <div id="orderList"></div>
     <div id="deliveredSection"></div>
@@ -857,7 +859,9 @@ function renderWorkshop(){
     renderList(true);
   };
   document.getElementById('bulkDeleteBtn').onclick = handleBulkDelete;
+  document.getElementById('bulkKesimBtn').onclick = handleBulkKesim;
   selectedForBulkDelete.clear();
+  selectedForBulkKesim.clear();
   document.querySelectorAll('#leftPanelToggle button').forEach(b=>{
     b.onclick = ()=> setLeftPanelTab(b.dataset.val);
   });
@@ -2476,7 +2480,7 @@ function orderCardHtml(o, isSellerView, isDelivered){
         ${kesimTamamlandiMi(o) ? '' : `<button class="btn btn-ghost ascBtn" data-id="${o.id}" title="ASC'ye aktar (Optime)">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5" stroke="#9CA3AF"/><text x="7" y="9.5" font-size="5.5" text-anchor="middle" fill="#9CA3AF" font-family="Arial" font-weight="bold">ASC</text></svg>
         </button>`}
-        <button class="btn btn-ghost etiketBtn" data-id="${o.id}" title="Etiket yazdır">🏷️</button>
+        ${kesimTamamlandiMi(o) ? '' : `<button class="btn btn-ghost etiketBtn" data-id="${o.id}" title="Etiket yazdır">🏷️</button>`}
         <button class="btn btn-ghost btn-sm undoDeliverBtn" data-id="${o.id}" title="Sevk edildi işaretini geri al">Geri al</button>
       </div>`;
     } else {
@@ -2488,7 +2492,7 @@ function orderCardHtml(o, isSellerView, isDelivered){
         ${kesimTamamlandiMi(o) ? '' : `<button class="btn btn-ghost ascBtn" data-id="${o.id}" title="ASC'ye aktar (Optime)">
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><rect x="1.5" y="1.5" width="11" height="11" rx="1.5" stroke="#9CA3AF"/><text x="7" y="9.5" font-size="5.5" text-anchor="middle" fill="#9CA3AF" font-family="Arial" font-weight="bold">ASC</text></svg>
         </button>`}
-        <button class="btn btn-ghost etiketBtn" data-id="${o.id}" title="Etiket yazdır">🏷️</button>
+        ${kesimTamamlandiMi(o) ? '' : `<button class="btn btn-ghost etiketBtn" data-id="${o.id}" title="Etiket yazdır">🏷️</button>`}
         ${o.status===0 ? `<button class="btn btn-ghost editBtn" data-id="${o.id}" title="Siparişi düzenle">✏️</button><button class="btn btn-ghost deleteBtn" data-id="${o.id}" title="Siparişi sil">🗑️</button>` : ''}
         <button class="btn btn-ghost prevBtn" data-id="${o.id}" ${o.status===0?'disabled':''}>‹</button>
         <button class="btn btn-primary nextBtn" data-id="${o.id}">${o.status===STATUSES.length-1?'Sevk edildi ✓':'İlerlet ›'}</button>
@@ -2503,9 +2507,11 @@ function orderCardHtml(o, isSellerView, isDelivered){
       </div>`;
   }
   const showBulkCheck = isSellerView && !isDelivered && o.status===0;
+  const showBulkKesimCheck = isSellerView && !isDelivered && o.status===URETIM_INDEX && !kesimTamamlandiMi(o);
   return `
     <div class="pane order-card" data-id="${o.id}">
       ${showBulkCheck ? `<input type="checkbox" class="orderBulkDelCheck" data-id="${o.id}" title="Toplu silmek için seç" ${selectedForBulkDelete.has(String(o.id))?'checked':''} style="position:absolute; top:10px; left:10px; width:16px; height:16px; accent-color:var(--accent); cursor:pointer; z-index:2;">` : ''}
+      ${showBulkKesimCheck ? `<input type="checkbox" class="orderBulkKesimCheck" data-id="${o.id}" title="Toplu 'Kesildi' işaretlemek için seç" ${selectedForBulkKesim.has(String(o.id))?'checked':''} style="position:absolute; top:10px; left:10px; width:16px; height:16px; accent-color:var(--primary); cursor:pointer; z-index:2;">` : ''}
       <div class="order-glyph">${paneGlyph(o.lines)}</div>
       <div class="order-body">
         <div class="order-top"><span class="order-id">#${o.id}</span><span class="order-cust">${o.bayi_adi ? o.bayi_adi + (o.cust_name && o.cust_name!==o.bayi_adi ? ' · 👤 '+o.cust_name : '') : (o.cust_name||'')}</span></div>
@@ -2567,6 +2573,14 @@ function renderList(isSellerView){
     };
   });
   updateBulkDeleteBar();
+  el.querySelectorAll('.orderBulkKesimCheck').forEach(c=>{
+    c.onchange = ()=>{
+      if(c.checked) selectedForBulkKesim.add(c.dataset.id);
+      else selectedForBulkKesim.delete(c.dataset.id);
+      updateBulkKesimBar();
+    };
+  });
+  updateBulkKesimBar();
 
   if(isSellerView){
     el.querySelectorAll('.excelBtn').forEach(b=>{
@@ -2692,6 +2706,33 @@ async function handleBulkDelete(){
   renderStats(); renderFilters(); renderList(true);
 }
 
+function updateBulkKesimBar(){
+  const btn = document.getElementById('bulkKesimBtn');
+  const countEl = document.getElementById('bulkKesimCount');
+  if(!btn || !countEl) return;
+  const n = selectedForBulkKesim.size;
+  countEl.textContent = n;
+  btn.style.display = n>0 ? 'inline-flex' : 'none';
+}
+
+// Üretimde'ki birden fazla siparişi tek seferde "Kesim" olarak işaretler —
+// her siparişin uretim_adimlari'ndaki diğer bayrakları (rodaj/temper/işlemde)
+// koruyarak sadece kesim:true ekliyor, üzerine yazmıyor.
+async function handleBulkKesim(){
+  const ids = [...selectedForBulkKesim];
+  if(ids.length===0) return;
+  if(!confirm(`${ids.length} sipariş "Kesildi" olarak işaretlensin mi?`)) return;
+  const sonuclar = await Promise.all(ids.map(id=>{
+    const o = orders.find(x=>String(x.id)===String(id));
+    const yeni = Object.assign({}, (o && o.uretim_adimlari) || {}, {kesim:true});
+    return sb.from('orders').update({uretim_adimlari: yeni}).eq('id', id);
+  }));
+  if(sonuclar.some(r=>r.error)){ alert('Bazı siparişler güncellenemedi, sayfayı yenileyip tekrar dene.'); }
+  selectedForBulkKesim.clear();
+  await loadOrdersForSeller();
+  renderStats(); renderFilters(); renderList(true);
+}
+
 /* =========================================================
    SİLİNENLER (soft-delete arşivi)
    ========================================================= */
@@ -2759,9 +2800,10 @@ function setBulkPanelTab(tab){
   });
 }
 function isOrderIsicam(o){ return isIsicamKategori(o.category); }
-// Kesim adımı işaretlenmiş siparişler için ASC (Optime) indirme kapatılır —
-// cam bir kere kesildikten sonra aynı ASC dosyasını tekrar indirip yanlışlıkla
-// tekrar kestirme riskini önlemek için. Excel/Etiket bundan etkilenmiyor.
+// Kesim adımı işaretlenmiş siparişlerde ASC (Optime) ve Etiket indirme/yazdırma
+// kapatılır — atölyede hepsi kesimden ÖNCE toplu hazırlandığı için, kesim
+// bittikten sonra tekrar indirmenin/basmanın bir anlamı yok (yanlışlıkla
+// tekrar kestirme riski de var). Excel etkilenmiyor.
 function kesimTamamlandiMi(o){ return !!(o.uretim_adimlari && o.uretim_adimlari.kesim); }
 let bulkCamTypeTab = 'cam';
 function setBulkCamTypeTab(tab){
@@ -3607,7 +3649,7 @@ function printEtiketlerBulk(selOrders){
 function renderBulkEtiket(){
   const el = document.getElementById('bulkEtiketSection');
   if(!el) return;
-  const active = orders.filter(o=>o.status < DELIVERED_INDEX && (o.lines||[]).length && isOrderIsicam(o)===(bulkCamTypeTab==='isicam'));
+  const active = orders.filter(o=>o.status < DELIVERED_INDEX && (o.lines||[]).length && isOrderIsicam(o)===(bulkCamTypeTab==='isicam') && !kesimTamamlandiMi(o));
   // Mevcut işaretleme durumunu koru — arama/filtre değişince kullanıcının elle
   // kaldırdığı tikler geri gelmesin.
   const prevChecked = {};
