@@ -838,9 +838,11 @@ function renderWorkshop(){
         <div class="seg" id="bulkPanelToggle" style="margin-bottom:14px; max-width:fit-content;">
           <button data-val="etiket" class="active">🏷️ Etiket</button>
           <button data-val="asc">📋 ASC</button>
+          <button data-val="teklif">📄 Teklif</button>
         </div>
         <div id="bulkEtiketSection"></div>
         <div id="bulkAscSection" style="display:none;"></div>
+        <div id="bulkTeklifSection" style="display:none;"></div>
       </div>
     </div>
     <div class="list-head">
@@ -2803,11 +2805,12 @@ let bulkPanelTab = 'etiket';
 function setBulkPanelTab(tab){
   bulkPanelTab = tab;
   document.querySelectorAll('#bulkPanelToggle button').forEach(b=> b.classList.toggle('active', b.dataset.val===tab));
-  const map = {etiket:'bulkEtiketSection', asc:'bulkAscSection'};
+  const map = {etiket:'bulkEtiketSection', asc:'bulkAscSection', teklif:'bulkTeklifSection'};
   Object.entries(map).forEach(([key,id])=>{
     const el = document.getElementById(id);
     if(el) el.style.display = key===tab ? 'block' : 'none';
   });
+  if(tab==='teklif') renderBulkTeklif();
 }
 function isOrderIsicam(o){ return isIsicamKategori(o.category); }
 // Kesim adımı işaretlenmiş siparişlerde ASC (Optime) ve Etiket indirme/yazdırma
@@ -3712,6 +3715,178 @@ function renderBulkEtiket(){
     if(sel.length===0){ alert('En az bir sipariş seçili olmalı.'); return; }
     printEtiketlerBulk(sel);
   };
+}
+
+/* =========================================================
+   TOPLU TEKLİF FORMU — seçilen siparişleri (genelde tek bir bayinin
+   bekleyen siparişleri) tek bir KDV'li fiyat teklifi/sipariş onay formuna
+   toplar, A4 yazdırma penceresinde açar (tarayıcının "PDF olarak kaydet"
+   seçeneğiyle PDF de alınabilir — ayrı bir PDF kütüphanesi gerekmiyor,
+   Etiket çıktısıyla aynı yöntem). Kaynak: kullanıcının elden kullandığı
+   "TEKLİF FORMU" Excel şablonu (07 Ağustos 2026).
+   ========================================================= */
+function renderBulkTeklif(){
+  const el = document.getElementById('bulkTeklifSection');
+  if(!el) return;
+  const active = orders.filter(o=>o.status < DELIVERED_INDEX && (o.lines||[]).length);
+  const prevChecked = {};
+  el.querySelectorAll('.bulkTklfCheck').forEach(c=>{ prevChecked[c.dataset.id] = c.checked; });
+  if(active.length===0){
+    el.innerHTML = `<div class="pane empty-state"><div style="font-size:13px;">Teklif formuna eklenecek bekleyen sipariş yok.</div></div>`;
+    return;
+  }
+  const groups = {};
+  active.forEach(o=>{
+    const key = o.bayi_adi || o.cust_name || 'Bayisiz';
+    (groups[key] = groups[key] || []).push(o);
+  });
+  const keys = Object.keys(groups).sort();
+  el.innerHTML = keys.map(key=>`
+    <div class="pane form-card bulk-asc-group" style="margin-bottom:14px;">
+      <div class="bulk-asc-head"><b>${key}</b><span class="hint">${groups[key].length} sipariş</span></div>
+      <div class="bulk-asc-list">
+        ${groups[key].map(o=>`
+          <label class="bulk-asc-item">
+            <input type="checkbox" class="bulkTklfCheck" data-id="${o.id}" ${prevChecked[o.id] ? 'checked' : ''}>
+            <span>#${o.id} · ${o.product_label||''} · ${orderPieceCount(o)} adet${o.cust_name && o.cust_name!==o.bayi_adi ? ' · 👤 '+o.cust_name : ''}</span>
+          </label>`).join('')}
+      </div>
+    </div>`).join('') + `
+    <div class="pane form-card" style="margin-top:4px;">
+      <div class="field-grid two" style="margin-bottom:10px;">
+        <div class="field"><label for="tklf_kdv">KDV %</label><input id="tklf_kdv" type="number" value="20" min="0" max="100"></div>
+        <div class="field"><label for="tklf_formno">Form no (opsiyonel)</label><input id="tklf_formno" type="text" placeholder="Boş bırakılırsa otomatik"></div>
+      </div>
+      <div class="field" style="margin-bottom:10px;">
+        <label for="tklf_not">Delik ölçü notu (formun altına aynen yazılır)</label>
+        <textarea id="tklf_not" placeholder="Örn: askı ve çift kol delikli camlar için&#10;kol delikleri boydan merkez delinecek">askı ve çift kol delikli camlar için
+kol delikleri boydan merkez delinecek</textarea>
+      </div>
+      <div class="form-actions">
+        <button class="btn btn-primary btn-sm" id="bulkTklfCreate">📄 Teklif formu oluştur</button>
+        <span class="hint" id="bulkTklfHint"></span>
+      </div>
+    </div>
+  `;
+  const selectedOrders = ()=>{
+    const ids = Array.from(el.querySelectorAll('.bulkTklfCheck')).filter(c=>c.checked).map(c=>c.dataset.id);
+    return orders.filter(o=>ids.includes(String(o.id)));
+  };
+  document.getElementById('bulkTklfCreate').onclick = ()=>{
+    const sel = selectedOrders();
+    const hintEl = document.getElementById('bulkTklfHint');
+    if(sel.length===0){ if(hintEl) hintEl.textContent = 'En az bir sipariş seçili olmalı.'; return; }
+    const kdv = parseFloat(document.getElementById('tklf_kdv').value) || 0;
+    const formNo = document.getElementById('tklf_formno').value.trim();
+    const not = document.getElementById('tklf_not').value;
+    openTeklifPrintWindow(buildTeklifFormuHtml(sel, kdv, not, formNo));
+  };
+}
+
+// Seçili siparişlerin tüm ölçü satırlarını tek listede toplar, m²/tutar/KDV
+// hesaplar. Birim fiyat her satırda zaten kayıtlı (l.fiyat, satıcı sipariş
+// girerken yazıyor) — burada sadece toplanıp biçimlendiriliyor.
+function buildTeklifFormuHtml(selOrders, kdvPercent, delikNot, formNo){
+  const firmaAdi = (profile && profile.workshop_name) || (profile && profile.full_name) || 'Atölye';
+  const email = (profile && profile.company_email) || '';
+  const tel = (profile && profile.company_phone) || '';
+  const web = (profile && profile.company_web) || '';
+  const adres = (profile && profile.company_address) || '';
+  const bayiAdi = selOrders[0].bayi_adi || '';
+  const musteriAdi = selOrders[0].cust_name || '';
+  const musteriAdres = selOrders[0].cust_address || '';
+  const tarih = new Date().toLocaleDateString('tr-TR');
+
+  const rows = [];
+  selOrders.forEach(o=>{
+    (o.lines||[]).forEach(l=>{
+      const m2 = lineM2(l);
+      const birimFiyat = parseFloat(l.fiyat) || 0;
+      const tutar = m2 * birimFiyat;
+      rows.push({
+        kalinlik: parseKalinlik(o.product_label) || o.product_label || '',
+        camAdi: o.renk || o.product_label || '',
+        adet: parseInt(l.qty) || 0,
+        en: l.w, boy: l.h, m2, birimFiyat, tutar,
+        aciklama: l.note || ''
+      });
+    });
+  });
+  const toplamAdet = rows.reduce((s,r)=>s+r.adet, 0);
+  const toplamM2 = rows.reduce((s,r)=>s+r.m2, 0);
+  const toplamFiyat = rows.reduce((s,r)=>s+r.tutar, 0);
+  const kdvTutari = toplamFiyat * (kdvPercent/100);
+  const genelToplam = toplamFiyat + kdvTutari;
+  const tl = n => n.toLocaleString('tr-TR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺';
+
+  return `
+    <!DOCTYPE html><html><head><meta charset="utf-8"><title>Teklif Formu</title>
+    <style>
+      @page { size: A4; margin: 10mm; }
+      body { margin:0; font-family: Arial, sans-serif; font-size:12px; color:#111; }
+      .tf-head { text-align:center; font-size:16px; font-weight:800; text-transform:uppercase; border:1px solid #000; padding:6px; margin-bottom:2px; }
+      .tf-sub { text-align:center; font-size:13px; font-weight:700; border:1px solid #000; border-top:none; padding:4px; margin-bottom:8px; }
+      .tf-firma { font-size:11px; margin-bottom:10px; line-height:1.5; }
+      table { width:100%; border-collapse:collapse; margin-bottom:8px; }
+      th, td { border:1px solid #999; padding:4px 6px; font-size:11px; text-align:left; }
+      th { background:#eee; }
+      td.num, th.num { text-align:right; }
+      .tf-totals { width:280px; margin-left:auto; margin-bottom:14px; }
+      .tf-totals td { border:none; padding:2px 6px; }
+      .tf-totals tr.son td { font-weight:800; border-top:1px solid #000; }
+      .tf-not { font-size:11px; white-space:pre-line; border:1px solid #999; padding:8px; margin-bottom:16px; max-width:260px; }
+      .tf-imza { display:flex; justify-content:space-between; margin-top:30px; }
+      .tf-imza div { width:45%; text-align:center; font-size:11px; }
+      .tf-imza .kutu { border-top:1px solid #000; margin-top:40px; padding-top:4px; }
+    </style>
+    </head><body>
+      <div class="tf-head">${firmaAdi}</div>
+      <div class="tf-sub">Teklif Formu</div>
+      <div class="tf-firma">
+        ${email ? 'E-MAİL: '+email+' &nbsp; ' : ''}${tel ? 'TEL: '+tel : ''}${web ? ' &nbsp; WEB: '+web : ''}<br>
+        ${adres ? 'ADRES: '+adres : ''}<br><br>
+        <b>BAYİ ADI:</b> ${bayiAdi} &nbsp; <b>MÜŞTERİ ADI:</b> ${musteriAdi}<br>
+        <b>ADRES:</b> ${musteriAdres} &nbsp; <b>FORM NO:</b> ${formNo || ('TKLF-'+Date.now().toString().slice(-6))} &nbsp; <b>TARİH:</b> ${tarih}
+      </div>
+      <table>
+        <thead><tr>
+          <th>Kalınlık</th><th>Cam adı</th><th class="num">Adet</th><th class="num">En</th><th class="num">Boy</th>
+          <th class="num">M²</th><th class="num">Birim fiyat</th><th class="num">Tutar</th><th>Açıklama</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r=>`<tr>
+            <td>${r.kalinlik}</td><td>${r.camAdi}</td><td class="num">${r.adet}</td><td class="num">${r.en}</td><td class="num">${r.boy}</td>
+            <td class="num">${r.m2.toFixed(3)}</td><td class="num">${tl(r.birimFiyat)}</td><td class="num">${tl(r.tutar)}</td><td>${r.aciklama}</td>
+          </tr>`).join('')}
+          <tr><td colspan="2"><b>GENEL TOPLAM</b></td><td class="num"><b>${toplamAdet}</b></td><td></td><td></td>
+            <td class="num"><b>${toplamM2.toFixed(3)}</b></td><td></td><td class="num"><b>${tl(toplamFiyat)}</b></td><td></td></tr>
+        </tbody>
+      </table>
+      <table class="tf-totals">
+        <tr><td>Toplam fiyat</td><td class="num">${tl(toplamFiyat)}</td></tr>
+        <tr><td>KDV %${kdvPercent}</td><td class="num">${tl(kdvTutari)}</td></tr>
+        <tr class="son"><td>Genel toplam</td><td class="num">${tl(genelToplam)}</td></tr>
+      </table>
+      <svg width="180" height="90" viewBox="0 0 180 90" style="display:block;margin-bottom:6px;">
+        <rect x="10" y="10" width="70" height="70" fill="none" stroke="#333"/>
+        <circle cx="25" cy="25" r="3" fill="#333"/>
+        <circle cx="65" cy="25" r="3" fill="#333"/>
+        <text x="10" y="88" font-size="8">ASKI: 13mm · KULP: 10mm</text>
+      </svg>
+      <div class="tf-not">${(delikNot||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</div>
+      <div class="tf-imza">
+        <div>ÜRETİCİ FİRMA<div class="kutu">KAŞE / İMZA</div></div>
+        <div>SİPARİŞÇİ FİRMA<div class="kutu">KAŞE / İMZA</div></div>
+      </div>
+    </body></html>
+  `;
+}
+
+function openTeklifPrintWindow(html){
+  const win = window.open('', '_blank');
+  win.document.write(html);
+  win.document.close();
+  win.onload = ()=> win.print();
 }
 
 /* =========================================================
