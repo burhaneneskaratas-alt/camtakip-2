@@ -3874,30 +3874,43 @@ function buildTeklifFormuHtml(selOrders, kdvPercent, formNo){
   const kdvTutari = toplamFiyat * (kdvPercent/100);
   const genelToplam = toplamFiyat + kdvTutari;
   const tl = n => n.toLocaleString('tr-TR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺';
+  const dosyaAdi = ('Teklif-'+(bayiAdi||musteriAdi||'form')+'-'+tarih.replace(/\./g,'-')+'.pdf')
+    .normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/[İIı]/g,'i').replace(/[^a-zA-Z0-9.\-]/g,'_');
 
   return `
     <!DOCTYPE html><html><head><meta charset="utf-8"><title>Teklif Formu</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"><\/script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"><\/script>
     <style>
       @page { size: A4; margin: 10mm; }
-      body { margin:0; font-family: Arial, sans-serif; font-size:12px; color:#111; }
-      .tf-head { text-align:center; font-size:16px; font-weight:800; text-transform:uppercase; border:1px solid #000; padding:6px; margin-bottom:2px; }
-      .tf-sub { text-align:center; font-size:13px; font-weight:700; border:1px solid #000; border-top:none; padding:4px; margin-bottom:8px; }
-      .tf-firma { font-size:11px; margin-bottom:10px; line-height:1.5; }
+      .tf-actionbar { display:flex; gap:10px; margin-bottom:14px; }
+      .tf-actionbar button { font-size:14px; font-weight:700; padding:9px 16px; border-radius:6px; border:1px solid #999; background:#f5f5f5; cursor:pointer; }
+      .tf-actionbar button:hover { background:#eee; }
+      @media print { .tf-actionbar { display:none; } }
+      body { margin:0; font-family: Arial, sans-serif; font-size:15px; font-weight:600; color:#111; }
+      .tf-head { text-align:center; font-size:19px; font-weight:800; text-transform:uppercase; border:1px solid #000; padding:6px; margin-bottom:2px; }
+      .tf-sub { text-align:center; font-size:16px; font-weight:800; border:1px solid #000; border-top:none; padding:4px; margin-bottom:8px; }
+      .tf-firma { font-size:14px; font-weight:600; margin-bottom:10px; line-height:1.6; }
       .tf-headwrap { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
       .tf-logo { max-width:110px; max-height:60px; object-fit:contain; }
       .tf-delikwrap { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:16px; }
       table { width:100%; border-collapse:collapse; margin-bottom:8px; }
-      th, td { border:1px solid #999; padding:4px 6px; font-size:11px; text-align:left; }
-      th { background:#eee; }
+      th, td { border:1px solid #999; padding:5px 7px; font-size:14px; font-weight:600; text-align:left; }
+      th { background:#eee; font-weight:800; }
       td.num, th.num { text-align:right; }
-      .tf-totals { width:280px; margin-left:auto; margin-bottom:14px; }
-      .tf-totals td { border:none; padding:2px 6px; }
-      .tf-totals tr.son td { font-weight:800; border-top:1px solid #000; }
+      .tf-totals { width:320px; margin-left:auto; margin-bottom:14px; }
+      .tf-totals td { border:none; padding:3px 6px; font-size:15px; font-weight:700; }
+      .tf-totals tr.son td { font-weight:900; font-size:17px; border-top:1px solid #000; }
       .tf-imza { display:flex; justify-content:space-between; margin-top:30px; }
-      .tf-imza div { width:45%; text-align:center; font-size:11px; }
+      .tf-imza div { width:45%; text-align:center; font-size:14px; font-weight:700; }
       .tf-imza .kutu { border-top:1px solid #000; margin-top:40px; padding-top:4px; }
     </style>
     </head><body>
+      <div class="tf-actionbar">
+        <button id="tfPrintBtn" type="button">🖨️ Yazdır</button>
+        <button id="tfPdfBtn" type="button">💾 PDF indir (WhatsApp'a atmak için)</button>
+      </div>
+      <div id="tf-page">
       <div class="tf-headwrap">
         <div style="flex:1;">
           <div class="tf-head">${firmaAdi}</div>
@@ -3935,6 +3948,29 @@ function buildTeklifFormuHtml(selOrders, kdvPercent, formNo){
         <div>ÜRETİCİ FİRMA<div class="kutu">KAŞE / İMZA</div></div>
         <div>SİPARİŞÇİ FİRMA<div class="kutu">KAŞE / İMZA</div></div>
       </div>
+      </div>
+      <script>
+        document.getElementById('tfPrintBtn').onclick = function(){ window.print(); };
+        document.getElementById('tfPdfBtn').onclick = async function(){
+          const btn = document.getElementById('tfPdfBtn');
+          const eskiMetin = btn.textContent;
+          btn.textContent = 'Hazırlanıyor…'; btn.disabled = true;
+          try {
+            const el = document.getElementById('tf-page');
+            const canvas = await html2canvas(el, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
+            const imgData = canvas.toDataURL('image/jpeg', 0.95);
+            const pdf = new window.jspdf.jsPDF('p','mm','a4');
+            const pageW = pdf.internal.pageSize.getWidth();
+            const pageH = pdf.internal.pageSize.getHeight();
+            const imgH = Math.min(canvas.height*pageW/canvas.width, pageH);
+            pdf.addImage(imgData, 'JPEG', 0, 0, pageW, imgH);
+            pdf.save(${JSON.stringify(dosyaAdi)});
+          } catch(e) {
+            alert('PDF oluşturulamadı: ' + e.message);
+          }
+          btn.textContent = eskiMetin; btn.disabled = false;
+        };
+      <\/script>
     </body></html>
   `;
 }
@@ -3953,7 +3989,6 @@ function openTeklifPrintWindow(html){
   const win = window.open('', '_blank');
   win.document.write(html);
   win.document.close();
-  win.onload = ()=> win.print();
 }
 
 /* =========================================================
