@@ -3999,7 +3999,14 @@ function buildTeklifFormuHtml(selOrders, kdvPercent, formNo){
           btn.textContent = 'Hazırlanıyor…'; btn.disabled = true;
           try {
             const el = document.getElementById('tf-page');
-            const canvas = await html2canvas(el, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
+            // windowWidth/scrollX/scrollY ŞART: html2canvas varsayılan olarak
+            // pop-up penceresinin GÖRÜNÜR viewport genişliğini kullanıyor, body
+            // 1100px sabit olsa bile pencere dar açılmışsa taşan sağ taraf
+            // (Birim fiyat/Tutar/Açıklama sütunları, sağ imza kutusu) sessizce
+            // kırpılıyordu (07 Ağustos 2026, gerçek PDF çıktısıyla yakalandı —
+            // önceki "table-layout:fixed" düzeltmesi görünüşü düzeltti ama asıl
+            // kırpma sebebi bu değildi, html2canvas'ın kendi yakalama genişliğiydi).
+            const canvas = await html2canvas(el, {scale:2, useCORS:true, backgroundColor:'#ffffff', windowWidth:1100, scrollX:0, scrollY:0});
             const imgData = canvas.toDataURL('image/jpeg', 0.95);
             // Sabit A4 sayfa yerine, içeriğin gerçek en-boy oranına göre özel sayfa
             // boyutu — WhatsApp'ta boş alan yüzünden küçük görünmesin diye (07 Ağustos
