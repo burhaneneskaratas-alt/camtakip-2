@@ -440,7 +440,7 @@ function setupRealtime(){
       // Toplu Etiket/ASC panelleri renderList'e dahil değil — aynı hesabı iki
       // kişi kullanınca biri "etiketi çıktı" işaretleyince diğerinin ekranı da
       // güncellensin diye (07 Ağustos 2026).
-      if(isSatici){ renderBulkEtiket(); renderBulkAsc(); }
+      if(isSatici){ renderBulkEtiket(); renderBulkAsc(); renderTeklifList(); }
     })
     .subscribe();
 }
@@ -515,7 +515,7 @@ async function loadProductsForSellerId(sellerId){
 
 /* Sipariş formundaki Kategori / Ürün seçim kutuları
    prefix: 'w' (satıcı hızlı sipariş) veya 'c' (müşteri ölçü bildirimi) */
-function productsSource(prefix){ return prefix==='w' ? myProducts : customerProducts; }
+function productsSource(prefix){ return prefix==='c' ? customerProducts : myProducts; }
 
 function setupOrderProductSelects(prefix){
   const catSel = document.getElementById(prefix+'_kategori');
@@ -808,11 +808,17 @@ function renderWorkshop(){
         <div class="lines-total"><span class="hint">Toplam m²</span><span class="lines-total-val" id="w_totalM2">0,00 m²</span></div>
       </div>
       <div class="field"><label for="w_note">Not</label><input id="w_note" type="text" placeholder="Örn: 2 delik, çentikli kesim"></div>
-      <div class="field">
-        <label for="w_fiyat">Birim Fiyat (TL/m², opsiyonel — sadece Excel'e yazılır)</label>
-        <input id="w_fiyat" type="number" step="0.01" placeholder="0">
-        <div class="hint" style="margin-top:4px;">Toplam m² ile çarpılıp Excel çıktısında ayrı bir bölümde gösterilir, ekranda hiçbir yerde görünmez.</div>
+      <div class="field-grid two">
+        <div class="field">
+          <label for="w_fiyat">Birim Fiyat (TL/m², opsiyonel — sadece Excel'e yazılır)</label>
+          <input id="w_fiyat" type="number" step="0.01" placeholder="0">
+        </div>
+        <div class="field">
+          <label for="w_kdv">Teklif KDV % (sadece "Teklif olarak kaydet" için)</label>
+          <input id="w_kdv" type="number" step="0.01" value="0">
+        </div>
       </div>
+      <div class="hint" style="margin-top:-8px; margin-bottom:12px;">Birim fiyat toplam m² ile çarpılıp Excel çıktısında ayrı bir bölümde gösterilir, ekranda hiçbir yerde görünmez.</div>
       <div class="field">
         <label for="w_asc_code">Optime Customer Kodu (opsiyonel)</label>
         <input id="w_asc_code" type="text" placeholder="Boş bırakırsan otomatik hesaplanır (örn: MSTF-YY3)">
@@ -820,10 +826,13 @@ function renderWorkshop(){
       </div>
       <div class="form-actions">
         <button class="btn btn-primary" id="w_submit">Siparişi ekle</button>
+        <button class="btn btn-ghost" id="w_submitTeklif">📝 Teklif olarak kaydet</button>
         <button class="btn btn-ghost btn-sm" id="w_cancelEdit" style="display:none;">Düzenlemeyi iptal et</button>
         <span class="hint" id="w_status"></span>
       </div>
     </div>
+    <div class="section-eyebrow">Bekleyen Teklifler</div>
+    <div id="teklifList"></div>
     <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:20px; align-items:start;">
       <div class="pane" style="padding:18px 20px;">
         <div class="seg" id="leftPanelToggle" style="margin-bottom:14px; max-width:fit-content;">
@@ -892,8 +901,10 @@ function renderWorkshop(){
   document.getElementById('w_addLine').onclick = addLine;
   document.getElementById('w_mrBtn').onclick = ()=> openMeasureReader('lines','w');
   document.getElementById('w_xlBtn').onclick = ()=> openExcelImport('w');
-  document.getElementById('w_submit').onclick = submitWorkshopOrder;
+  document.getElementById('w_submit').onclick = ()=> submitWorkshopOrder(false);
+  document.getElementById('w_submitTeklif').onclick = ()=> submitWorkshopOrder(true);
   document.getElementById('w_cancelEdit').onclick = ()=> cancelEdit('w');
+  renderTeklifList();
   // Isıcam checkbox handler'ları (satıcı)
   document.getElementById('w_isicam').onchange = function(){
     document.getElementById('w_isicam_detail').style.display = this.checked ? 'block' : 'none';
@@ -1003,7 +1014,12 @@ function renderMyCustomersList(){
       </div>`).join('');
 }
 
-async function submitWorkshopOrder(){
+// asTeklif=true olunca aynı form, aynı ölçü/ürün alanlarıyla ama "Bekleyen
+// Teklifler"e düşen bir taslak kaydeder (is_teklif:true + KDV) — düzenleme
+// (editingOrderId) sadece gerçek sipariş akışında geçerli, teklif her zaman
+// yeni kayıt (07 Ağustos 2026: kullanıcı ayrı bir form istemedi, "aynı yerde
+// gireceğiz, sadece tuşlar yan yana olacak" dedi — tek form, iki buton).
+async function submitWorkshopOrder(asTeklif){
   const statusEl = document.getElementById('w_status');
   const linesClean = lineState.filter(l=>l.w && l.h && l.qty);
   if(linesClean.length===0){ statusEl.textContent = 'En az bir ölçü satırı girin.'; return; }
@@ -1027,19 +1043,23 @@ async function submitWorkshopOrder(){
     due: document.getElementById('w_due').value || null,
     status: 0
   };
-  const wasEditing = editingOrderId;
+  if(asTeklif){
+    row.is_teklif = true;
+    row.teklif_kdv = parseFloat(document.getElementById('w_kdv').value) || 0;
+  }
+  const wasEditing = !asTeklif && editingOrderId;
   const {data, error} = wasEditing
     ? await sb.from('orders').update(row).eq('id', wasEditing).select()
     : await sb.from('orders').insert(row).select();
   if(error){ statusEl.textContent = 'Hata: ' + error.message; return; }
   if(wasEditing && (!data || data.length===0)){ statusEl.textContent = 'Güncellenemedi (yetkin olmayabilir). Sayfayı yenileyip tekrar dene.'; return; }
-  statusEl.textContent = wasEditing ? 'Güncellendi ✓' : 'Eklendi ✓';
+  statusEl.textContent = asTeklif ? 'Teklif kaydedildi ✓' : (wasEditing ? 'Güncellendi ✓' : 'Eklendi ✓');
   editingOrderId = null;
   document.getElementById('w_submit').textContent = 'Siparişi ekle';
   document.getElementById('w_cancelEdit').style.display = 'none';
   await loadOrdersForSeller();
-  renderStats(); renderFilters(); renderList(true);
-  document.getElementById('w_bayi').value=''; document.getElementById('w_cust').value=''; document.getElementById('w_addr').value=''; document.getElementById('w_note').value=''; document.getElementById('w_due').value=''; document.getElementById('w_fiyat').value='';
+  renderStats(); renderFilters(); renderList(true); renderTeklifList();
+  document.getElementById('w_bayi').value=''; document.getElementById('w_cust').value=''; document.getElementById('w_addr').value=''; document.getElementById('w_note').value=''; document.getElementById('w_due').value=''; document.getElementById('w_fiyat').value=''; document.getElementById('w_kdv').value='0';
   document.getElementById('w_isicam').checked=false; document.getElementById('w_isicam_detail').style.display='none';
   lineState=[]; addLine();
   setTimeout(()=>statusEl.textContent='',2000);
@@ -1523,6 +1543,56 @@ function renderLines(){
   });
   const totalEl = document.getElementById(prefix+'_totalM2');
   if(totalEl) totalEl.textContent = fmtM2(linesTotalM2(lineState));
+}
+
+function renderTeklifList(){
+  const el = document.getElementById('teklifList');
+  if(!el) return;
+  const teklifler = orders.filter(o=>o.is_teklif);
+  if(teklifler.length===0){
+    el.innerHTML = `<div class="pane empty-state"><div style="font-size:13px;">Bekleyen teklif yok.</div></div>`;
+    return;
+  }
+  el.innerHTML = teklifler.map(o=>{
+    const m2 = linesTotalM2(o.lines||[]);
+    const birimFiyat = parseFloat((o.lines&&o.lines[0]&&o.lines[0].fiyat)||0);
+    const kdv = parseFloat(o.teklif_kdv)||0;
+    const tutar = m2 * birimFiyat;
+    const kdvli = tutar * (1+kdv/100);
+    const tl = n => n.toLocaleString('tr-TR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺';
+    return `<div class="pane" style="padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
+      <div style="flex:1; min-width:200px;">
+        <b>${o.bayi_adi||''}</b>${o.cust_name && o.cust_name!==o.bayi_adi ? ' · 👤 '+o.cust_name : ''}
+        <div class="hint">${o.product_label||''} · ${m2.toFixed(3)} m² · Birim ${tl(birimFiyat)} · KDV %${kdv} · <b>Toplam ${tl(kdvli)}</b></div>
+      </div>
+      <button class="btn btn-primary btn-sm teklifConvertBtn" data-id="${o.id}">Siparişi Ekle</button>
+      <button class="btn btn-ghost btn-sm teklifDeleteBtn" data-id="${o.id}">Sil</button>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.teklifConvertBtn').forEach(b=>{
+    b.onclick = async ()=>{
+      const o = orders.find(x=>String(x.id)===b.dataset.id);
+      if(!o) return;
+      const kdv = parseFloat(o.teklif_kdv)||0;
+      // Kabul edilince KDV birim fiyatın içine gömülüyor — sipariş artık normal
+      // bir sipariş gibi tek bir "fiyat" taşıyor, KDV'yi ayrıca takip etmeye
+      // gerek kalmıyor (07 Ağustos 2026 isteği: "fiyat KDV dahil yazılacak").
+      const yeniLines = (o.lines||[]).map(l=>({...l, fiyat: ((parseFloat(l.fiyat)||0) * (1+kdv/100)).toFixed(2)}));
+      const {data, error} = await sb.from('orders').update({is_teklif:false, lines:yeniLines}).eq('id', o.id).select();
+      if(sbCheckRow(data, error, 'Siparişe çevrilemedi.')) return;
+      await loadOrdersForSeller();
+      renderStats(); renderFilters(); renderList(true); renderTeklifList();
+    };
+  });
+  el.querySelectorAll('.teklifDeleteBtn').forEach(b=>{
+    b.onclick = async ()=>{
+      if(!confirm('Bu teklifi silmek istediğine emin misin?')) return;
+      const {error} = await sb.from('orders').delete().eq('id', b.dataset.id);
+      if(error){ alert('Silinemedi: '+error.message); return; }
+      await loadOrdersForSeller();
+      renderTeklifList();
+    };
+  });
 }
 
 // ====================================================================
@@ -2470,7 +2540,7 @@ function renderDelikPngBase64(line, size){
 function renderStats(){
   const el = document.getElementById('statStrip');
   if(!el) return;
-  const counts = STATUSES.map((s,i)=>orders.filter(o=>o.status===i).length);
+  const counts = STATUSES.map((s,i)=>orders.filter(o=>o.status===i && !o.is_teklif).length);
   el.innerHTML = STATUSES.map((s,i)=>`<div class="pane stat-card"><div class="stat-num">${counts[i]}</div><div class="stat-label">${s.short}</div></div>`).join('');
 }
 
@@ -2490,7 +2560,7 @@ function renderFilters(){
 function renderThicknessFilters(){
   const el = document.getElementById('thicknessFilterRow');
   if(!el) return;
-  const activeOrders = orders.filter(o=>o.status < DELIVERED_INDEX);
+  const activeOrders = orders.filter(o=>o.status < DELIVERED_INDEX && !o.is_teklif);
   const present = new Set(activeOrders.map(orderThicknessKey));
   if(present.size <= 1){ el.innerHTML = ''; return; }
   const order = ['4MM','5MM','6MM','8MM','ISI CAM','DİĞER'];
@@ -2587,8 +2657,8 @@ function orderCardHtml(o, isSellerView, isDelivered){
 function renderList(isSellerView){
   const el = document.getElementById('orderList');
   if(!el) return;
-  const activeOrders = orders.filter(o=>o.status < DELIVERED_INDEX);
-  const deliveredOrders = orders.filter(o=>o.status === DELIVERED_INDEX);
+  const activeOrders = orders.filter(o=>o.status < DELIVERED_INDEX && !o.is_teklif);
+  const deliveredOrders = orders.filter(o=>o.status === DELIVERED_INDEX && !o.is_teklif);
   let list = activeOrders.slice();
   if(isSellerView && activeFilter !== 'all') list = list.filter(o=>String(o.status)===activeFilter);
   if(isSellerView && thicknessFilter !== 'all') list = list.filter(o=>orderThicknessKey(o)===thicknessFilter);
@@ -2902,18 +2972,21 @@ function renderReportSection(){
   const isicamMatch = (o)=> (o.renk||'').match(/^Isıcam:\s*([\d.,]+)\+([\d.,]+)\+([\d.,]+)\s+/i);
   const reportM2ForOrder = (o) => linesTotalM2(o.lines||[]) * (isicamMatch(o) ? 2 : 1);
   const m2Of = (list) => list.reduce((s,o)=> s + reportM2ForOrder(o), 0);
+  // Teklif aşamasındaki (henüz kabul edilmemiş) satırlar gerçek sipariş
+  // sayılmıyor, raporlara karışmasın (07 Ağustos 2026).
+  const reportOrders = orders.filter(o=>!o.is_teklif);
 
   const periods = [
-    {label:'Bugün', list: orders.filter(o=>inRange(o, startOfDay))},
-    {label:'Bu hafta', list: orders.filter(o=>inRange(o, startOfWeek))},
-    {label:'Bu ay', list: orders.filter(o=>inRange(o, startOfMonth))},
-    {label:'Toplam', list: orders}
+    {label:'Bugün', list: reportOrders.filter(o=>inRange(o, startOfDay))},
+    {label:'Bu hafta', list: reportOrders.filter(o=>inRange(o, startOfWeek))},
+    {label:'Bu ay', list: reportOrders.filter(o=>inRange(o, startOfMonth))},
+    {label:'Toplam', list: reportOrders}
   ];
 
   // Cam kalınlığına göre m² dağılımı (tüm zamanlar) — "8mm'den kaç m² sattık" gibi sorulara cevap.
   // Isıcam siparişler her iki cam kalınlığının (dış+iç) kendi kovasına tam alan olarak eklenir.
   const byThickness = {};
-  orders.forEach(o=>{
+  reportOrders.forEach(o=>{
     const m = isicamMatch(o);
     const m2 = linesTotalM2(o.lines||[]);
     if(m){
@@ -2928,7 +3001,7 @@ function renderReportSection(){
   const thicknessEntries = Object.entries(byThickness).sort((a,b)=>b[1]-a[1]);
 
   const bayiCounts = {};
-  orders.forEach(o=>{
+  reportOrders.forEach(o=>{
     const key = o.bayi_adi || o.cust_name || '—';
     bayiCounts[key] = (bayiCounts[key]||0) + 1;
   });
@@ -3737,7 +3810,7 @@ let etiketDismissed = new Set();
 function renderBulkEtiket(){
   const el = document.getElementById('bulkEtiketSection');
   if(!el) return;
-  const active = orders.filter(o=>o.status < DELIVERED_INDEX && (o.lines||[]).length && isOrderIsicam(o)===(bulkCamTypeTab==='isicam') && !o.etiket_basildi && !etiketDismissed.has(String(o.id)));
+  const active = orders.filter(o=>o.status < DELIVERED_INDEX && !o.is_teklif && (o.lines||[]).length && isOrderIsicam(o)===(bulkCamTypeTab==='isicam') && !o.etiket_basildi && !etiketDismissed.has(String(o.id)));
   // Mevcut işaretleme durumunu koru — arama/filtre değişince kullanıcının elle
   // işaretlediği tikler geri gelmesin. Varsayılan artık İŞARETSİZ (07 Ağustos
   // 2026 isteği) — daha önce hiç dokunulmamışsa boş gelir, "Tümünü seç" ile
@@ -3829,7 +3902,7 @@ function renderBulkEtiket(){
 function renderBulkTeklif(){
   const el = document.getElementById('bulkTeklifSection');
   if(!el) return;
-  const active = orders.filter(o=>o.status < DELIVERED_INDEX && (o.lines||[]).length);
+  const active = orders.filter(o=>o.status < DELIVERED_INDEX && !o.is_teklif && (o.lines||[]).length);
   const prevChecked = {};
   el.querySelectorAll('.bulkTklfCheck').forEach(c=>{ prevChecked[c.dataset.id] = c.checked; });
   if(active.length===0){
@@ -4084,7 +4157,7 @@ function renderBulkAsc(){
   const el = document.getElementById('bulkAscSection');
   if(!el) return;
   const isIsicamTab = bulkCamTypeTab==='isicam';
-  const active = orders.filter(o=>o.status < DELIVERED_INDEX && isOrderIsicam(o)===isIsicamTab && !kesimTamamlandiMi(o));
+  const active = orders.filter(o=>o.status < DELIVERED_INDEX && !o.is_teklif && isOrderIsicam(o)===isIsicamTab && !kesimTamamlandiMi(o));
   // Mevcut işaretleme durumunu koru — arama/filtre değişince kullanıcının elle
   // kaldırdığı tikler geri gelmesin.
   const prevChecked = {};
