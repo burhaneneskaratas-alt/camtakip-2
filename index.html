@@ -2119,11 +2119,11 @@ function dsRenderSVGPrint(delikSablonData, widthPx){
       if(!a.decorative){
         const val = (olculer[a.id]!=null && olculer[a.id]!=='') ? olculer[a.id] : a.def;
         const lbl = dsAutoLabel(a);
-        out += `<text x="${lbl.x}" y="${lbl.y}" font-size="9" fill="#000" text-anchor="middle">${val}</text>`;
+        out += `<text x="${lbl.x}" y="${lbl.y}" font-size="17" font-weight="800" fill="#000" text-anchor="middle">${val}</text>`;
       }
     });
     if(p.note) p.note.split('\n').forEach((line,i)=>{
-      out += `<text x="${p.noteX}" y="${p.noteY+12+(i*12)}" font-size="8" fill="#000">${line}</text>`;
+      out += `<text x="${p.noteX}" y="${p.noteY+14+(i*17)}" font-size="16" font-weight="700" fill="#000">${line}</text>`;
     });
   });
   out += `</svg>`;
@@ -3867,7 +3867,7 @@ function buildTeklifFormuHtml(selOrders, kdvPercent, formNo){
   // Delik/Poz panelinden hangi şablon (çift kol, askı+çift kol, menteşe...) ve
   // hangi ölçülerle kaydedildiyse (l.delikSablon), aynısı burada da çizilir.
   // Tek bir sabit çizim kullanılmaz, kimi sipariş çift kol ister kimi askılı.
-  const delikDiagrams = rows.filter(r=>r.delikSablon).map(r=>dsRenderSVGPrint(r.delikSablon, 190));
+  const delikDiagrams = rows.filter(r=>r.delikSablon).map(r=>dsRenderSVGPrint(r.delikSablon, 330));
   const toplamAdet = rows.reduce((s,r)=>s+r.adet, 0);
   const toplamM2 = rows.reduce((s,r)=>s+r.m2, 0);
   const toplamFiyat = rows.reduce((s,r)=>s+r.tutar, 0);
@@ -3887,22 +3887,22 @@ function buildTeklifFormuHtml(selOrders, kdvPercent, formNo){
       .tf-actionbar button { font-size:14px; font-weight:700; padding:9px 16px; border-radius:6px; border:1px solid #999; background:#f5f5f5; cursor:pointer; }
       .tf-actionbar button:hover { background:#eee; }
       @media print { .tf-actionbar { display:none; } }
-      body { margin:0; font-family: Arial, sans-serif; font-size:15px; font-weight:600; color:#111; }
-      .tf-head { text-align:center; font-size:19px; font-weight:800; text-transform:uppercase; border:1px solid #000; padding:6px; margin-bottom:2px; }
-      .tf-sub { text-align:center; font-size:16px; font-weight:800; border:1px solid #000; border-top:none; padding:4px; margin-bottom:8px; }
-      .tf-firma { font-size:14px; font-weight:600; margin-bottom:10px; line-height:1.6; }
+      body { margin:0; font-family: Arial, sans-serif; font-size:19px; font-weight:700; color:#111; }
+      .tf-head { text-align:center; font-size:26px; font-weight:900; text-transform:uppercase; border:2px solid #000; padding:9px; margin-bottom:3px; }
+      .tf-sub { text-align:center; font-size:20px; font-weight:900; border:2px solid #000; border-top:none; padding:6px; margin-bottom:10px; }
+      .tf-firma { font-size:18px; font-weight:700; margin-bottom:12px; line-height:1.7; }
       .tf-headwrap { display:flex; justify-content:space-between; align-items:flex-start; gap:10px; }
-      .tf-logo { max-width:110px; max-height:60px; object-fit:contain; }
+      .tf-logo { max-width:140px; max-height:80px; object-fit:contain; }
       .tf-delikwrap { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:16px; }
-      table { width:100%; border-collapse:collapse; margin-bottom:8px; }
-      th, td { border:1px solid #999; padding:5px 7px; font-size:14px; font-weight:600; text-align:left; }
-      th { background:#eee; font-weight:800; }
+      table { width:100%; border-collapse:collapse; margin-bottom:10px; }
+      th, td { border:1px solid #999; padding:8px 9px; font-size:18px; font-weight:700; text-align:left; }
+      th { background:#eee; font-weight:900; }
       td.num, th.num { text-align:right; }
-      .tf-totals { width:320px; margin-left:auto; margin-bottom:14px; }
-      .tf-totals td { border:none; padding:3px 6px; font-size:15px; font-weight:700; }
-      .tf-totals tr.son td { font-weight:900; font-size:17px; border-top:1px solid #000; }
+      .tf-totals { width:380px; margin-left:auto; margin-bottom:16px; }
+      .tf-totals td { border:none; padding:5px 8px; font-size:19px; font-weight:800; }
+      .tf-totals tr.son td { font-weight:900; font-size:22px; border-top:2px solid #000; }
       .tf-imza { display:flex; justify-content:space-between; margin-top:30px; }
-      .tf-imza div { width:45%; text-align:center; font-size:14px; font-weight:700; }
+      .tf-imza div { width:45%; text-align:center; font-size:18px; font-weight:800; }
       .tf-imza .kutu { border-top:1px solid #000; margin-top:40px; padding-top:4px; }
     </style>
     </head><body>
@@ -3959,11 +3959,13 @@ function buildTeklifFormuHtml(selOrders, kdvPercent, formNo){
             const el = document.getElementById('tf-page');
             const canvas = await html2canvas(el, {scale:2, useCORS:true, backgroundColor:'#ffffff'});
             const imgData = canvas.toDataURL('image/jpeg', 0.95);
-            const pdf = new window.jspdf.jsPDF('p','mm','a4');
-            const pageW = pdf.internal.pageSize.getWidth();
-            const pageH = pdf.internal.pageSize.getHeight();
-            const imgH = Math.min(canvas.height*pageW/canvas.width, pageH);
-            pdf.addImage(imgData, 'JPEG', 0, 0, pageW, imgH);
+            // Sabit A4 sayfa yerine, içeriğin gerçek en-boy oranına göre özel sayfa
+            // boyutu — WhatsApp'ta boş alan yüzünden küçük görünmesin diye (07 Ağustos
+            // 2026): sayfa tam içerik kadar, altında boşluk kalmıyor.
+            const pageWmm = 190;
+            const pageHmm = canvas.height * pageWmm / canvas.width;
+            const pdf = new window.jspdf.jsPDF({orientation:'p', unit:'mm', format:[pageWmm, pageHmm]});
+            pdf.addImage(imgData, 'JPEG', 0, 0, pageWmm, pageHmm);
             pdf.save(${JSON.stringify(dosyaAdi)});
           } catch(e) {
             alert('PDF oluşturulamadı: ' + e.message);
