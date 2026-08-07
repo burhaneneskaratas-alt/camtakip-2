@@ -2274,7 +2274,8 @@ document.getElementById('ds_saveDefault').onclick = async ()=>{
 // ====================================================================
 const EMU_PER_PT = 12700;
 const DS_DEFAULT_ROW_PT = 15; // proje genelinde varsayılan satır yüksekliği (bkz. EXCEL_ROWS_PER_A4_PAGE yorumu) — sayfada özel satır yüksekliği yok
-function dsEmu(pt){ return Math.round(pt*EMU_PER_PT); }
+const DS_EXCEL_SCALE = 0.85; // delik şeması Excel'de çok az küçültülsün diye (07 Ağustos 2026) — tüm ölçüler orantılı küçülür
+function dsEmu(pt){ return Math.round(pt*DS_EXCEL_SCALE*EMU_PER_PT); }
 function dsXmlEsc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 // 0-indeksli satırın sayfa üzerindeki mutlak Y'si (EMU) — absoluteAnchor için.
 function dsRowTopEmu(row){ return Math.round(row * DS_DEFAULT_ROW_PT * EMU_PER_PT); }
@@ -3866,7 +3867,7 @@ function buildTeklifFormuHtml(selOrders, kdvPercent, formNo){
   // Delik/Poz panelinden hangi şablon (çift kol, askı+çift kol, menteşe...) ve
   // hangi ölçülerle kaydedildiyse (l.delikSablon), aynısı burada da çizilir.
   // Tek bir sabit çizim kullanılmaz, kimi sipariş çift kol ister kimi askılı.
-  const delikDiagrams = rows.filter(r=>r.delikSablon).map(r=>dsRenderSVGPrint(r.delikSablon, 120));
+  const delikDiagrams = rows.filter(r=>r.delikSablon).map(r=>dsRenderSVGPrint(r.delikSablon, 190));
   const toplamAdet = rows.reduce((s,r)=>s+r.adet, 0);
   const toplamM2 = rows.reduce((s,r)=>s+r.m2, 0);
   const toplamFiyat = rows.reduce((s,r)=>s+r.tutar, 0);
