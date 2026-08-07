@@ -437,6 +437,10 @@ function setupRealtime(){
     .on('postgres_changes', {event:'*', schema:'public', table:'orders', filter:`${col}=eq.${profile.id}`}, async ()=>{
       if(isSatici) await loadOrdersForSeller(); else await loadOrdersForCustomer();
       renderStats(); renderFilters(); renderList(isSatici);
+      // Toplu Etiket/ASC panelleri renderList'e dahil değil — aynı hesabı iki
+      // kişi kullanınca biri "etiketi çıktı" işaretleyince diğerinin ekranı da
+      // güncellensin diye (07 Ağustos 2026).
+      if(isSatici){ renderBulkEtiket(); renderBulkAsc(); }
     })
     .subscribe();
 }
@@ -3721,14 +3725,19 @@ function printEtiketlerBulk(selOrders){
 // "Etiketi çıktı" işaretlemesi yazdırma butonundan BAĞIMSIZ (07 Ağustos 2026,
 // ikinci tur isteği) — kullanıcı yazdırdığı anla işaretlemek istediği an aynı
 // olmayabiliyor (başka yoldan da basmış olabilir), o yüzden kendi seçtiklerini
-// ayrı bir butonla işaretleyip direkt listeden düşürüyor, ara rozet/onay adımı
-// yok. Sayfa yenilenince sıfırlanır, kalıcı bir DB durumu değil.
+// ayrı bir butonla işaretleyip direkt listeden düşürüyor. Artık `orders.
+// etiket_basildi` kolonuna KALICI yazılıyor (07 Ağustos 2026, üçüncü tur —
+// aynı hesabı iki kişi ayrı bilgisayardan kullanıyor, sadece client-side Set
+// olunca biri işaretleyince diğerinde görünmüyordu). Realtime abonelik zaten
+// var (setupRealtime), oraya da bu paneli yenileme eklendi ki iki taraf da
+// anlık görsün. etiketDismissed sadece DB yazısı tamamlanana kadar anlık/
+// iyimser (optimistic) bir ekran güncellemesi için.
 let etiketDismissed = new Set();
 
 function renderBulkEtiket(){
   const el = document.getElementById('bulkEtiketSection');
   if(!el) return;
-  const active = orders.filter(o=>o.status < DELIVERED_INDEX && (o.lines||[]).length && isOrderIsicam(o)===(bulkCamTypeTab==='isicam') && !etiketDismissed.has(String(o.id)));
+  const active = orders.filter(o=>o.status < DELIVERED_INDEX && (o.lines||[]).length && isOrderIsicam(o)===(bulkCamTypeTab==='isicam') && !o.etiket_basildi && !etiketDismissed.has(String(o.id)));
   // Mevcut işaretleme durumunu koru — arama/filtre değişince kullanıcının elle
   // işaretlediği tikler geri gelmesin. Varsayılan artık İŞARETSİZ (07 Ağustos
   // 2026 isteği) — daha önce hiç dokunulmamışsa boş gelir, "Tümünü seç" ile
@@ -3794,10 +3803,17 @@ function renderBulkEtiket(){
     if(sel.length===0){ alert('En az bir sipariş seçili olmalı.'); return; }
     printEtiketlerBulk(sel);
   };
-  document.getElementById('bulkEtkDone').onclick = ()=>{
+  document.getElementById('bulkEtkDone').onclick = async ()=>{
     const sel = selectedOrders();
     if(sel.length===0){ alert('En az bir sipariş seçili olmalı.'); return; }
+    // Önce ekranda anında kaybolsun (iyimser güncelleme), sonra veritabanına yaz —
+    // iş arkadaşının ekranında da görünsün diye kalıcı (07 Ağustos 2026).
     sel.forEach(o=> etiketDismissed.add(String(o.id)));
+    renderBulkEtiket();
+    const ids = sel.map(o=>o.id);
+    const {error} = await sb.from('orders').update({etiket_basildi:true}).in('id', ids);
+    if(error){ alert('Kaydedilemedi (bağlantı sorunu olabilir): ' + error.message); return; }
+    await loadOrdersForSeller();
     renderBulkEtiket();
   };
 }
