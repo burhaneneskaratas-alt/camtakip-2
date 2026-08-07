@@ -3718,11 +3718,11 @@ function printEtiketlerBulk(selOrders){
 // TOPLU ETİKET arayüzü — bekleyen siparişleri işaretleme kutularıyla listeler,
 // seçilenlerin toplam etiket adedine göre kaç sayfa tutacağını ve sayfanın
 // ne kadarının boş (fire) kalacağını gösterir.
-// Bir siparişin etiketi bu oturumda basıldıysa id'si burada tutulur — liste
-// otomatik silmiyor, "✓ Etiketi çıktı" rozeti gösterip kullanıcı tıklayınca
-// listeden kaldırıyor (07 Ağustos 2026 isteği). Sayfa yenilenince sıfırlanır,
-// kalıcı bir durum değil, sadece o oturumluk bir hatırlatma/temizlik.
-let etiketPrinted = new Set();
+// "Etiketi çıktı" işaretlemesi yazdırma butonundan BAĞIMSIZ (07 Ağustos 2026,
+// ikinci tur isteği) — kullanıcı yazdırdığı anla işaretlemek istediği an aynı
+// olmayabiliyor (başka yoldan da basmış olabilir), o yüzden kendi seçtiklerini
+// ayrı bir butonla işaretleyip direkt listeden düşürüyor, ara rozet/onay adımı
+// yok. Sayfa yenilenince sıfırlanır, kalıcı bir DB durumu değil.
 let etiketDismissed = new Set();
 
 function renderBulkEtiket(){
@@ -3755,11 +3755,7 @@ function renderBulkEtiket(){
         </label>
       </div>
       <div class="bulk-asc-list">
-        ${groups[key].map(o=> etiketPrinted.has(String(o.id)) ? `
-          <div class="bulk-asc-item" style="color:#16794b;">
-            <span>✓ Etiketi çıktı — #${o.id} · ${o.bayi_adi||''}</span>
-            <button class="btn btn-ghost btn-sm etkDismiss" data-id="${o.id}" style="margin-left:auto;">Kaldır</button>
-          </div>` : `
+        ${groups[key].map(o=>`
           <label class="bulk-asc-item">
             <input type="checkbox" class="bulkEtkCheck" data-key="${key}" data-id="${o.id}" ${prevChecked[o.id] ? 'checked' : ''}>
             <span>#${o.id} · ${o.bayi_adi||''}${o.cust_name && o.cust_name!==o.bayi_adi ? ' · 👤 '+o.cust_name : ''}${o.cust_address?' · 📍'+o.cust_address:''} · ${orderPieceCount(o)} etiket</span>
@@ -3768,6 +3764,7 @@ function renderBulkEtiket(){
     </div>`).join('') + `
     <div class="form-actions" style="margin-top:10px;">
       <button class="btn btn-primary btn-sm" id="bulkEtkPrint">🏷️ Seçilenleri birlikte yazdır</button>
+      <button class="btn btn-ghost btn-sm" id="bulkEtkDone">✅ Seçilenlerin etiketi çıktı</button>
       <span class="hint" id="bulkEtkHint"></span>
     </div>
   `;
@@ -3791,15 +3788,16 @@ function renderBulkEtiket(){
       updateHint();
     };
   });
-  el.querySelectorAll('.etkDismiss').forEach(b=>{
-    b.onclick = ()=>{ etiketDismissed.add(b.dataset.id); etiketPrinted.delete(b.dataset.id); renderBulkEtiket(); };
-  });
   updateHint();
   document.getElementById('bulkEtkPrint').onclick = ()=>{
     const sel = selectedOrders();
     if(sel.length===0){ alert('En az bir sipariş seçili olmalı.'); return; }
     printEtiketlerBulk(sel);
-    sel.forEach(o=> etiketPrinted.add(String(o.id)));
+  };
+  document.getElementById('bulkEtkDone').onclick = ()=>{
+    const sel = selectedOrders();
+    if(sel.length===0){ alert('En az bir sipariş seçili olmalı.'); return; }
+    sel.forEach(o=> etiketDismissed.add(String(o.id)));
     renderBulkEtiket();
   };
 }
