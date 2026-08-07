@@ -2123,7 +2123,7 @@ function dsRenderSVGPrint(delikSablonData, widthPx){
       }
     });
     if(p.note) p.note.split('\n').forEach((line,i)=>{
-      out += `<text x="${p.noteX}" y="${p.noteY+14+(i*17)}" font-size="16" font-weight="700" fill="#000">${line}</text>`;
+      out += `<text x="${p.noteX}" y="${p.noteY+13+(i*15)}" font-size="13" font-weight="700" fill="#000">${line}</text>`;
     });
   });
   out += `</svg>`;
@@ -3887,7 +3887,7 @@ function buildTeklifFormuHtml(selOrders, kdvPercent, formNo){
       .tf-actionbar button { font-size:14px; font-weight:700; padding:9px 16px; border-radius:6px; border:1px solid #999; background:#f5f5f5; cursor:pointer; }
       .tf-actionbar button:hover { background:#eee; }
       @media print { .tf-actionbar { display:none; } }
-      body { margin:0; font-family: Arial, sans-serif; font-size:19px; font-weight:700; color:#111; }
+      body { margin:0 auto; width:1100px; font-family: Arial, sans-serif; font-size:19px; font-weight:700; color:#111; }
       .tf-head { text-align:center; font-size:26px; font-weight:900; text-transform:uppercase; border:2px solid #000; padding:9px; margin-bottom:3px; }
       .tf-sub { text-align:center; font-size:20px; font-weight:900; border:2px solid #000; border-top:none; padding:6px; margin-bottom:10px; }
       .tf-firma { font-size:18px; font-weight:700; margin-bottom:12px; line-height:1.7; }
@@ -3895,9 +3895,19 @@ function buildTeklifFormuHtml(selOrders, kdvPercent, formNo){
       .tf-logo { max-width:140px; max-height:80px; object-fit:contain; }
       .tf-delikwrap { display:flex; flex-wrap:wrap; gap:14px; margin-bottom:16px; }
       table { width:100%; border-collapse:collapse; margin-bottom:10px; }
-      th, td { border:1px solid #999; padding:8px 9px; font-size:18px; font-weight:700; text-align:left; }
+      th, td { border:1px solid #999; padding:7px 8px; font-size:15px; font-weight:700; text-align:left; word-wrap:break-word; overflow-wrap:break-word; }
       th { background:#eee; font-weight:900; }
       td.num, th.num { text-align:right; }
+      .tf-datatable { table-layout:fixed; }
+      .tf-datatable th:nth-child(1), .tf-datatable td:nth-child(1) { width:8%; }
+      .tf-datatable th:nth-child(2), .tf-datatable td:nth-child(2) { width:13%; }
+      .tf-datatable th:nth-child(3), .tf-datatable td:nth-child(3) { width:7%; }
+      .tf-datatable th:nth-child(4), .tf-datatable td:nth-child(4) { width:8%; }
+      .tf-datatable th:nth-child(5), .tf-datatable td:nth-child(5) { width:8%; }
+      .tf-datatable th:nth-child(6), .tf-datatable td:nth-child(6) { width:9%; }
+      .tf-datatable th:nth-child(7), .tf-datatable td:nth-child(7) { width:12%; }
+      .tf-datatable th:nth-child(8), .tf-datatable td:nth-child(8) { width:12%; }
+      .tf-datatable th:nth-child(9), .tf-datatable td:nth-child(9) { width:23%; }
       .tf-totals { width:380px; margin-left:auto; margin-bottom:16px; }
       .tf-totals td { border:none; padding:5px 8px; font-size:19px; font-weight:800; }
       .tf-totals tr.son td { font-weight:900; font-size:22px; border-top:2px solid #000; }
@@ -3924,7 +3934,7 @@ function buildTeklifFormuHtml(selOrders, kdvPercent, formNo){
         <b>BAYİ ADI:</b> ${bayiAdi} &nbsp; <b>MÜŞTERİ ADI:</b> ${musteriAdi}<br>
         <b>ADRES:</b> ${musteriAdres} &nbsp; <b>FORM NO:</b> ${formNo || ('TKLF-'+Date.now().toString().slice(-6))} &nbsp; <b>TARİH:</b> ${tarih}
       </div>
-      <table>
+      <table class="tf-datatable">
         <thead><tr>
           <th>Kalınlık</th><th>Cam adı</th><th class="num">Adet</th><th class="num">En</th><th class="num">Boy</th>
           <th class="num">M²</th><th class="num">Birim fiyat</th><th class="num">Tutar</th><th>Açıklama</th>
