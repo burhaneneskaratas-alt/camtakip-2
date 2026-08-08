@@ -819,6 +819,12 @@ function renderWorkshop(){
         </div>
       </div>
       <div class="hint" style="margin-top:-8px; margin-bottom:12px;">Birim fiyat toplam m² ile çarpılıp Excel çıktısında ayrı bir bölümde gösterilir, ekranda hiçbir yerde görünmez.</div>
+      <div class="field-grid three" style="margin-bottom:6px;">
+        <div class="field" style="grid-column:span 1;"><label for="w_ek_aciklama">Ek ücret açıklaması (opsiyonel)</label><input id="w_ek_aciklama" type="text" placeholder="Örn: Baca deliği"></div>
+        <div class="field"><label for="w_ek_fiyat">Ek ücret birim fiyatı</label><input id="w_ek_fiyat" type="number" step="0.01" placeholder="0"></div>
+        <div class="field"><label for="w_ek_adet">Adet</label><input id="w_ek_adet" type="number" placeholder="0"></div>
+      </div>
+      <div class="hint" style="margin-top:-4px; margin-bottom:12px;">Baca/menfez gibi delik başı sabit ücretler için — bu da yukarıdaki KDV'den etkilenir, Excel'deki toplama eklenir.</div>
       <div class="field">
         <label for="w_asc_code">Optime Customer Kodu (opsiyonel)</label>
         <input id="w_asc_code" type="text" placeholder="Boş bırakırsan otomatik hesaplanır (örn: MSTF-YY3)">
@@ -1036,6 +1042,16 @@ async function submitWorkshopOrder(asTeklif){
   const fiyatForLines = (!asTeklif && kdvGirisi>0 && rawFiyat!=='')
     ? (parseFloat(rawFiyat) * (1+kdvGirisi/100)).toFixed(2)
     : rawFiyat;
+  // Ek ücret — baca/menfez gibi delik başı sabit ücret, ölçü satırlarından
+  // bağımsız, sipariş genelinde TEK bir kalem (açıklama + birim fiyat +
+  // adet). Aynı KDV kuralına tabi: "Siparişi ekle"de hemen gömülür, teklifte
+  // ham kalır, dönüşümde teklifConvertBtn gömer (07 Ağustos 2026).
+  const ekAciklama = document.getElementById('w_ek_aciklama').value.trim();
+  const ekRawFiyat = document.getElementById('w_ek_fiyat').value || '';
+  const ekAdet = parseInt(document.getElementById('w_ek_adet').value) || 0;
+  const ekFiyatForRow = (!asTeklif && kdvGirisi>0 && ekRawFiyat!=='')
+    ? (parseFloat(ekRawFiyat) * (1+kdvGirisi/100)).toFixed(2)
+    : ekRawFiyat;
   const row = {
     seller_id: profile.id,
     customer_id: null,
@@ -1051,7 +1067,12 @@ async function submitWorkshopOrder(asTeklif){
     note: document.getElementById('w_note').value,
     asc_customer_code: document.getElementById('w_asc_code').value.trim() || null,
     due: document.getElementById('w_due').value || null,
-    status: 0
+    status: 0,
+    ek_ucret: (ekAciklama || ekRawFiyat || ekAdet) ? {
+      aciklama: ekAciklama,
+      fiyat: asTeklif ? ekRawFiyat : ekFiyatForRow,
+      adet: ekAdet
+    } : null
   };
   if(asTeklif){
     row.is_teklif = true;
@@ -1070,6 +1091,7 @@ async function submitWorkshopOrder(asTeklif){
   await loadOrdersForSeller();
   renderStats(); renderFilters(); renderList(true); renderTeklifList();
   document.getElementById('w_bayi').value=''; document.getElementById('w_cust').value=''; document.getElementById('w_addr').value=''; document.getElementById('w_note').value=''; document.getElementById('w_due').value=''; document.getElementById('w_fiyat').value=''; document.getElementById('w_kdv').value='0';
+  document.getElementById('w_ek_aciklama').value=''; document.getElementById('w_ek_fiyat').value=''; document.getElementById('w_ek_adet').value='';
   document.getElementById('w_isicam').checked=false; document.getElementById('w_isicam_detail').style.display='none';
   lineState=[]; addLine();
   setTimeout(()=>statusEl.textContent='',2000);
@@ -1374,6 +1396,16 @@ function openEditOrder(o, isSellerView){
   if(lineState.length===0) lineState.push({w:'',h:'',qty:1,note:'',sekilli:false, fiyat:'', isicam: null});
   renderLines();
 
+  if(isSellerView){
+    const ekAciklamaEl = document.getElementById('w_ek_aciklama');
+    const ekFiyatEl = document.getElementById('w_ek_fiyat');
+    const ekAdetEl = document.getElementById('w_ek_adet');
+    const ek = o.ek_ucret || {};
+    if(ekAciklamaEl) ekAciklamaEl.value = ek.aciklama || '';
+    if(ekFiyatEl) ekFiyatEl.value = ek.fiyat || '';
+    if(ekAdetEl) ekAdetEl.value = ek.adet || '';
+  }
+
   const submitBtn = document.getElementById(prefix+'_submit');
   if(submitBtn) submitBtn.textContent = 'Değişiklikleri kaydet';
   const cancelBtn = document.getElementById(prefix+'_cancelEdit');
@@ -1566,8 +1598,10 @@ function renderTeklifList(){
   el.innerHTML = teklifler.map(o=>{
     const m2 = linesTotalM2(o.lines||[]);
     const birimFiyat = parseFloat((o.lines&&o.lines[0]&&o.lines[0].fiyat)||0);
+    const ekUcret = o.ek_ucret || {};
+    const ekToplam = (parseFloat(ekUcret.fiyat)||0) * (parseInt(ekUcret.adet)||0);
     const kdv = parseFloat(o.teklif_kdv)||0;
-    const tutar = m2 * birimFiyat;
+    const tutar = m2 * birimFiyat + ekToplam;
     const kdvli = tutar * (1+kdv/100);
     const tl = n => n.toLocaleString('tr-TR', {minimumFractionDigits:2, maximumFractionDigits:2}) + ' ₺';
     return `<div class="pane" style="padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
@@ -1593,11 +1627,13 @@ function renderTeklifList(){
       const o = orders.find(x=>String(x.id)===b.dataset.id);
       if(!o) return;
       const kdv = parseFloat(o.teklif_kdv)||0;
-      // Kabul edilince KDV birim fiyatın içine gömülüyor — sipariş artık normal
-      // bir sipariş gibi tek bir "fiyat" taşıyor, KDV'yi ayrıca takip etmeye
-      // gerek kalmıyor (07 Ağustos 2026 isteği: "fiyat KDV dahil yazılacak").
+      // Kabul edilince KDV birim fiyatın (ve varsa sipariş geneli ek ücretin)
+      // içine gömülüyor — sipariş artık normal bir sipariş gibi tek bir
+      // "fiyat" taşıyor, KDV'yi ayrıca takip etmeye gerek kalmıyor (07
+      // Ağustos 2026 isteği: "fiyat KDV dahil yazılacak").
       const yeniLines = (o.lines||[]).map(l=>({...l, fiyat: ((parseFloat(l.fiyat)||0) * (1+kdv/100)).toFixed(2)}));
-      const {data, error} = await sb.from('orders').update({is_teklif:false, lines:yeniLines}).eq('id', o.id).select();
+      const yeniEkUcret = o.ek_ucret ? {...o.ek_ucret, fiyat: ((parseFloat(o.ek_ucret.fiyat)||0) * (1+kdv/100)).toFixed(2)} : null;
+      const {data, error} = await sb.from('orders').update({is_teklif:false, lines:yeniLines, ek_ucret:yeniEkUcret}).eq('id', o.id).select();
       if(sbCheckRow(data, error, 'Siparişe çevrilemedi.')) return;
       await loadOrdersForSeller();
       renderStats(); renderFilters(); renderList(true); renderTeklifList();
@@ -3278,8 +3314,10 @@ function drawOrderExcelBlock(wb, ws, o, base, delikSablonAnchors){
   // Fiyat — sadece en az bir satıra birim fiyat girilmişse eklenir. Bilerek tablonun
   // SAĞINA (K/L sütunları) yazılıyor: A4 yazdırma alanı sadece A:I sütunlarını kapsıyor,
   // bu yüzden fiyat ekranda/Excel'de görünür ama kağıda hiç basılmıyor.
+  const ekUcret = o.ek_ucret || null;
+  const ekToplam = ekUcret ? (parseFloat(ekUcret.fiyat)||0) * (parseInt(ekUcret.adet)||0) : 0;
   const fiyatLines = lines.filter(l=>l.fiyat && parseFloat(l.fiyat)>0);
-  if(fiyatLines.length){
+  if(fiyatLines.length || ekToplam>0){
     styleCell(ws.getCell(`K${R(11)}`), {font:FONT_TBL, align:{h:'center'}, border:false});
     ws.getCell(`K${R(11)}`).value = 'Birim Fiyat (TL/m²)';
     styleCell(ws.getCell(`L${R(11)}`), {font:FONT_TBL, align:{h:'center'}, border:false});
@@ -3301,6 +3339,10 @@ function drawOrderExcelBlock(wb, ws, o, base, delikSablonAnchors){
       styleCell(ws.getCell(`L${r}`), {font:FONT_TBL_N, align:{h:'center'}, border:false, numFmt:'#,##0.00'});
       ws.getCell(`L${r}`).value = tutar;
     });
+    // Sipariş geneli ek ücret (baca/menfez vb.) — ayrı satır açmadan (sayfa
+    // düzeni/sayfa bölme hesabını bozmamak için) doğrudan GENEL TOPLAM'a
+    // eklenir. Açıklaması sadece uygulama ekranında görünür (07 Ağustos 2026).
+    genelTutar += ekToplam;
     styleCell(ws.getCell(`K${totalRow}`), {font:FONT_TBL, fill:GRAY_FILL, border:false, align:{h:'right'}});
     ws.getCell(`K${totalRow}`).value = 'GENEL TOPLAM:';
     styleCell(ws.getCell(`L${totalRow}`), {font:FONT_TBL, fill:GRAY_FILL, border:false, numFmt:'#,##0.00 "TL"'});
@@ -3938,6 +3980,17 @@ function buildTeklifFormuHtml(selOrders, kdvPercent, formNo){
         delikSablon: l.delikSablon || null
       });
     });
+    // Sipariş geneli ek ücret (baca/menfez vb.) — ayrı, açıklamalı bir satır
+    // olarak eklenir (07 Ağustos 2026).
+    if(o.ek_ucret && o.ek_ucret.aciklama){
+      const ekFiyat = parseFloat(o.ek_ucret.fiyat)||0;
+      const ekAdet = parseInt(o.ek_ucret.adet)||0;
+      rows.push({
+        kalinlik: '', camAdi: o.ek_ucret.aciklama, adet: ekAdet,
+        en: '', boy: '', m2: 0, birimFiyat: ekFiyat, tutar: ekFiyat*ekAdet,
+        aciklama: 'Ek ücret', delikSablon: null
+      });
+    }
   });
   // Her satırın KENDİ seçtiği delik şablonu neyse o basılır — sipariş girilirken
   // Delik/Poz panelinden hangi şablon (çift kol, askı+çift kol, menteşe...) ve
