@@ -814,7 +814,7 @@ function renderWorkshop(){
           <input id="w_fiyat" type="number" step="0.01" placeholder="0">
         </div>
         <div class="field">
-          <label for="w_kdv">Teklif KDV % (sadece "Teklif olarak kaydet" için)</label>
+          <label for="w_kdv">KDV % (girersen Excel'e KDV dahil fiyat yazılır)</label>
           <input id="w_kdv" type="number" step="0.01" value="0">
         </div>
       </div>
@@ -1024,6 +1024,18 @@ async function submitWorkshopOrder(asTeklif){
   const prod = selectedProduct('w');
   if(!prod.aciklama){ statusEl.textContent = 'Lütfen kataloğunuzdan bir ürün seçin (kataloğunuz boşsa yukarıdan yükleyin).'; return; }
   statusEl.textContent = editingOrderId ? 'Güncelleniyor…' : 'Kaydediliyor…';
+  const kdvGirisi = parseFloat(document.getElementById('w_kdv').value) || 0;
+  const rawFiyat = document.getElementById('w_fiyat').value || '';
+  // Normal sipariş yolunda (teklif değil) KDV girildiyse, birim fiyata hemen
+  // gömülüp öyle kaydediliyor — kullanıcının kuralı: birim fiyatları hep
+  // KDV dahil tutuyor, bazı müşteriler için KDV'siz girip burada KDV'lisini
+  // hesaplatmak istiyor, Excel'e KDV dahil hâli yazılmalı (07 Ağustos 2026).
+  // Teklif yolunda ise KDV ayrı tutulur (row.teklif_kdv) — "Bekleyen
+  // Teklifler" listesinde Birim/KDV/Toplam ayrı ayrı gösterilebilsin diye,
+  // gömme işlemi ancak "Siparişi Ekle" ile kabul edilince yapılır.
+  const fiyatForLines = (!asTeklif && kdvGirisi>0 && rawFiyat!=='')
+    ? (parseFloat(rawFiyat) * (1+kdvGirisi/100)).toFixed(2)
+    : rawFiyat;
   const row = {
     seller_id: profile.id,
     customer_id: null,
@@ -1035,7 +1047,7 @@ async function submitWorkshopOrder(asTeklif){
     renk: document.getElementById('w_isicam').checked
       ? buildIsicamText('w')
       : segVal('w_renk'),
-    lines: linesClean.map(l=>({w:parseFloat(l.w), h:parseFloat(l.h), qty:parseInt(l.qty), note:l.note||'', dm:l.dm||[], delikSablon:l.delikSablon||null, sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:l.isicam||{}, fiyat:document.getElementById('w_fiyat').value||''})),
+    lines: linesClean.map(l=>({w:parseFloat(l.w), h:parseFloat(l.h), qty:parseInt(l.qty), note:l.note||'', dm:l.dm||[], delikSablon:l.delikSablon||null, sekilli:l.sekilli||false, sekilFotoUrl:l.sekilFotoUrl||null, isicam:l.isicam||{}, fiyat: asTeklif ? rawFiyat : fiyatForLines})),
     note: document.getElementById('w_note').value,
     asc_customer_code: document.getElementById('w_asc_code').value.trim() || null,
     due: document.getElementById('w_due').value || null,
@@ -1043,7 +1055,7 @@ async function submitWorkshopOrder(asTeklif){
   };
   if(asTeklif){
     row.is_teklif = true;
-    row.teklif_kdv = parseFloat(document.getElementById('w_kdv').value) || 0;
+    row.teklif_kdv = kdvGirisi;
   }
   const wasEditing = !asTeklif && editingOrderId;
   const {data, error} = wasEditing
