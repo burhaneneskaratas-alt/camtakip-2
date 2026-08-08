@@ -851,11 +851,9 @@ function renderWorkshop(){
         <div class="seg" id="bulkPanelToggle" style="margin-bottom:14px; max-width:fit-content;">
           <button data-val="etiket" class="active">🏷️ Etiket</button>
           <button data-val="asc">📋 ASC</button>
-          <button data-val="teklif">📄 Teklif</button>
         </div>
         <div id="bulkEtiketSection"></div>
         <div id="bulkAscSection" style="display:none;"></div>
-        <div id="bulkTeklifSection" style="display:none;"></div>
       </div>
     </div>
     <div class="list-head">
@@ -1565,10 +1563,19 @@ function renderTeklifList(){
         <b>${o.bayi_adi||''}</b>${o.cust_name && o.cust_name!==o.bayi_adi ? ' · 👤 '+o.cust_name : ''}
         <div class="hint">${o.product_label||''} · ${m2.toFixed(3)} m² · Birim ${tl(birimFiyat)} · KDV %${kdv} · <b>Toplam ${tl(kdvli)}</b></div>
       </div>
+      <button class="btn btn-ghost btn-sm teklifFormuBtn" data-id="${o.id}">📄 Teklif Formu</button>
       <button class="btn btn-primary btn-sm teklifConvertBtn" data-id="${o.id}">Siparişi Ekle</button>
       <button class="btn btn-ghost btn-sm teklifDeleteBtn" data-id="${o.id}">Sil</button>
     </div>`;
   }).join('');
+  el.querySelectorAll('.teklifFormuBtn').forEach(b=>{
+    b.onclick = ()=>{
+      const o = orders.find(x=>String(x.id)===b.dataset.id);
+      if(!o) return;
+      if(!(o.lines||[]).length){ alert('Bu teklifte ölçü satırı yok.'); return; }
+      openTeklifPrintWindow(buildTeklifFormuHtml([o], parseFloat(o.teklif_kdv)||0, ''));
+    };
+  });
   el.querySelectorAll('.teklifConvertBtn').forEach(b=>{
     b.onclick = async ()=>{
       const o = orders.find(x=>String(x.id)===b.dataset.id);
@@ -2938,12 +2945,11 @@ let bulkPanelTab = 'etiket';
 function setBulkPanelTab(tab){
   bulkPanelTab = tab;
   document.querySelectorAll('#bulkPanelToggle button').forEach(b=> b.classList.toggle('active', b.dataset.val===tab));
-  const map = {etiket:'bulkEtiketSection', asc:'bulkAscSection', teklif:'bulkTeklifSection'};
+  const map = {etiket:'bulkEtiketSection', asc:'bulkAscSection'};
   Object.entries(map).forEach(([key,id])=>{
     const el = document.getElementById(id);
     if(el) el.style.display = key===tab ? 'block' : 'none';
   });
-  if(tab==='teklif') renderBulkTeklif();
 }
 function isOrderIsicam(o){ return isIsicamKategori(o.category); }
 // Kesim adımı işaretlenmiş siparişlerde ASC (Optime) ve Etiket indirme/yazdırma
@@ -3888,67 +3894,6 @@ function renderBulkEtiket(){
     if(error){ alert('Kaydedilemedi (bağlantı sorunu olabilir): ' + error.message); return; }
     await loadOrdersForSeller();
     renderBulkEtiket();
-  };
-}
-
-/* =========================================================
-   TOPLU TEKLİF FORMU — seçilen siparişleri (genelde tek bir bayinin
-   bekleyen siparişleri) tek bir KDV'li fiyat teklifi/sipariş onay formuna
-   toplar, A4 yazdırma penceresinde açar (tarayıcının "PDF olarak kaydet"
-   seçeneğiyle PDF de alınabilir — ayrı bir PDF kütüphanesi gerekmiyor,
-   Etiket çıktısıyla aynı yöntem). Kaynak: kullanıcının elden kullandığı
-   "TEKLİF FORMU" Excel şablonu (07 Ağustos 2026).
-   ========================================================= */
-function renderBulkTeklif(){
-  const el = document.getElementById('bulkTeklifSection');
-  if(!el) return;
-  const active = orders.filter(o=>o.status < DELIVERED_INDEX && !o.is_teklif && (o.lines||[]).length);
-  const prevChecked = {};
-  el.querySelectorAll('.bulkTklfCheck').forEach(c=>{ prevChecked[c.dataset.id] = c.checked; });
-  if(active.length===0){
-    el.innerHTML = `<div class="pane empty-state"><div style="font-size:13px;">Teklif formuna eklenecek bekleyen sipariş yok.</div></div>`;
-    return;
-  }
-  const groups = {};
-  active.forEach(o=>{
-    const key = o.bayi_adi || o.cust_name || 'Bayisiz';
-    (groups[key] = groups[key] || []).push(o);
-  });
-  const keys = Object.keys(groups).sort();
-  el.innerHTML = keys.map(key=>`
-    <div class="pane form-card bulk-asc-group" style="margin-bottom:14px;">
-      <div class="bulk-asc-head"><b>${key}</b><span class="hint">${groups[key].length} sipariş</span></div>
-      <div class="bulk-asc-list">
-        ${groups[key].map(o=>`
-          <label class="bulk-asc-item">
-            <input type="checkbox" class="bulkTklfCheck" data-id="${o.id}" ${prevChecked[o.id] ? 'checked' : ''}>
-            <span>#${o.id} · ${o.product_label||''} · ${orderPieceCount(o)} adet${o.cust_name && o.cust_name!==o.bayi_adi ? ' · 👤 '+o.cust_name : ''}</span>
-          </label>`).join('')}
-      </div>
-    </div>`).join('') + `
-    <div class="pane form-card" style="margin-top:4px;">
-      <div class="field-grid two" style="margin-bottom:10px;">
-        <div class="field"><label for="tklf_kdv">KDV %</label><input id="tklf_kdv" type="number" value="20" min="0" max="100"></div>
-        <div class="field"><label for="tklf_formno">Form no (opsiyonel)</label><input id="tklf_formno" type="text" placeholder="Boş bırakılırsa otomatik"></div>
-      </div>
-      <div class="hint" style="margin-bottom:10px; display:block;">Delik ölçü şeması, her siparişin kendi Delik/Poz panelinde seçilmiş şablonuna göre otomatik eklenir.</div>
-      <div class="form-actions">
-        <button class="btn btn-primary btn-sm" id="bulkTklfCreate">📄 Teklif formu oluştur</button>
-        <span class="hint" id="bulkTklfHint"></span>
-      </div>
-    </div>
-  `;
-  const selectedOrders = ()=>{
-    const ids = Array.from(el.querySelectorAll('.bulkTklfCheck')).filter(c=>c.checked).map(c=>c.dataset.id);
-    return orders.filter(o=>ids.includes(String(o.id)));
-  };
-  document.getElementById('bulkTklfCreate').onclick = ()=>{
-    const sel = selectedOrders();
-    const hintEl = document.getElementById('bulkTklfHint');
-    if(sel.length===0){ if(hintEl) hintEl.textContent = 'En az bir sipariş seçili olmalı.'; return; }
-    const kdv = parseFloat(document.getElementById('tklf_kdv').value) || 0;
-    const formNo = document.getElementById('tklf_formno').value.trim();
-    openTeklifPrintWindow(buildTeklifFormuHtml(sel, kdv, formNo));
   };
 }
 
